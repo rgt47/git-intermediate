@@ -1,0 +1,22 @@
+# Colophon {.unnumbered}
+
+This book was produced with [Quarto](https://quarto.org),
+typeset in [Source Serif 4](https://fonts.adobe.com/fonts/source-serif),
+with code blocks set in [JetBrains
+Mono](https://www.jetbrains.com/lp/mono/). The command
+examples target Git 2.40 or later and the GitHub CLI (`gh`)
+2.40 or later.
+
+The book is hosted at <https://git-intermediate.rgtlab.org>
+on Netlify, with continuous deployment via GitHub Actions
+from the `rgt47/git-intermediate` repository on every push
+to `main`. The deployment recipe is in `HOSTING.md`.
+
+The cover is generated procedurally by
+`images/build-cover.R` from a slate gradient anchored on
+`#2c4a5e` (the volume's brand steel blue). Re-running the
+script regenerates the cover; the procedural approach makes
+it reproducible and editable in version control rather than
+dependent on a one-shot image-generation step.
+
+Last rendered: see the build timestamp on the homepage.

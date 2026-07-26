@@ -1,0 +1,14 @@
+_book/
+.quarto/
+*.html
+!nav-toggle.html
+*.pdf
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+node_modules/
+
+/.quarto/
+**/*.quarto_ipynb

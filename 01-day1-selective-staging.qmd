@@ -1,0 +1,593 @@
+# Day 1: Selective Staging and Work in Progress {#sec-day1}
+
+## Learning objectives
+
+By the end of this day you should be able to:
+
+- Explain why a commit should contain one logical change,
+  and why a mixed working directory obstructs that.
+- Stage part of a file with patch-mode `git add -p`,
+  responding to the hunk prompt and splitting or editing
+  hunks as needed.
+- Compose two or more clean commits from a single working
+  directory that mixes unrelated changes.
+- Discard selected changes with `git restore -p` and
+  unstage selected changes with `git restore --staged -p`.
+- Shelve unfinished work with `git stash`, inspect the
+  stash list, and restore work with `git stash pop` or
+  `git stash apply`.
+- Judge when to stash and when to make a work-in-progress
+  commit instead.
+
+## Lecture
+
+### The problem: a mixed working directory
+
+The boot camp established a principle: a good commit records
+a single logical change, so that the history reads as a
+sequence of intelligible steps and any one of them can be
+understood, reverted, or cited in isolation. The boot camp
+also gave you the tool for the simple case, namely
+`git add <file>` to stage a whole file.
+
+Real editing sessions rarely respect that principle. You sit
+down to fix a bug in `analysis.R` and, while you are there,
+you also improve an unrelated figure caption and add a line
+to the README. Now your working directory contains three
+unrelated changes. `git add analysis.R` would bundle the
+bug fix and the caption change into one commit, and a fourth
+`git add .` would sweep in the README too. The result is a
+commit whose message cannot honestly describe it, because it
+does more than one thing.
+
+You have two ways out. You could have committed more often,
+which is good advice but does not help once the changes are
+already interleaved. Or you can stage selectively:
+tell Git precisely which changes belong in the next commit,
+down to the individual line, and leave the rest in the
+working directory for a later commit. That is the subject of
+the first half of today.
+
+### Hunks and patch mode
+
+Git describes a change as a set of **hunks**. A hunk is a
+contiguous block of altered lines together with a few lines
+of unchanged context around it. When you run `git diff`, the
+blocks you see, each introduced by an `@@ ... @@` header, are
+hunks. Patch-mode staging works one hunk at a time.
+
+Suppose `analysis.R` has two unrelated edits. Near the top
+you fixed a missing `na.rm`; near the bottom you added a new
+subgroup table. `git diff` shows two hunks:
+
+```bash
+$ git diff analysis.R
+diff --git a/analysis.R b/analysis.R
+index 3a1f8c2..b7e4d90 100644
+--- a/analysis.R
++++ b/analysis.R
+@@ -4,7 +4,7 @@ dat <- read.csv("data-raw/trial.csv")
+
+-mean_hba1c <- mean(dat$hba1c)
++mean_hba1c <- mean(dat$hba1c, na.rm = TRUE)
+
+ n_total <- nrow(dat)
+@@ -18,3 +18,5 @@ summary_table <- dat |>
+   summarise(mean_change = mean(change, na.rm = TRUE))
++
++by_sex <- dat |> group_by(sex) |>
++  summarise(mean_change = mean(change, na.rm = TRUE))
+```
+
+These are two logically distinct changes that happen to sit
+in one file. To commit them separately, stage them
+separately with `git add -p` (equivalently
+`git add --patch`):
+
+```bash
+$ git add -p analysis.R
+```
+
+Git presents the first hunk and prompts:
+
+```bash
+@@ -4,7 +4,7 @@ dat <- read.csv("data-raw/trial.csv")
+-mean_hba1c <- mean(dat$hba1c)
++mean_hba1c <- mean(dat$hba1c, na.rm = TRUE)
+ n_total <- nrow(dat)
+(1/2) Stage this hunk [y,n,q,a,d,s,e,?]?
+```
+
+The letters are the commands. The essential ones:
+
+- `y` stage this hunk.
+- `n` do not stage this hunk.
+- `q` quit; stage nothing further.
+- `a` stage this hunk and all later hunks in the file.
+- `d` do not stage this hunk or any later hunk in the file.
+- `s` split the hunk into smaller hunks (only when the
+  change has a gap Git can split on).
+- `e` edit the hunk by hand (for the hard cases).
+- `?` print help.
+
+Here you want the `na.rm` fix but not the subgroup table, so
+answer `y` to the first hunk and `n` to the second:
+
+```bash
+(1/2) Stage this hunk [y,n,q,a,d,s,e,?]? y
+(2/2) Stage this hunk [y,n,q,a,d,s,e,?]? n
+```
+
+Confirm what you have staged with `git diff --staged`, which
+shows only the `na.rm` fix, and `git status`, which now lists
+`analysis.R` as both staged and modified, exactly the split
+state from the boot camp's staging discussion:
+
+```bash
+$ git diff --staged
+diff --git a/analysis.R b/analysis.R
+@@ -4,7 +4,7 @@ dat <- read.csv("data-raw/trial.csv")
+-mean_hba1c <- mean(dat$hba1c)
++mean_hba1c <- mean(dat$hba1c, na.rm = TRUE)
+```
+
+Commit the fix on its own, then stage and commit the
+remaining change:
+
+```bash
+$ git commit -m 'Fix missing na.rm in HbA1c mean'
+[main 5c7e9a1] Fix missing na.rm in HbA1c mean
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ git add analysis.R
+$ git commit -m 'Add change-in-HbA1c table by sex'
+[main 7d9f0b3] Add change-in-HbA1c table by sex
+ 1 file changed, 3 insertions(+)
+```
+
+One messy working directory has become two clean,
+single-purpose commits.
+
+::: {.callout-tip}
+## Tip
+
+Reach for `git add -p` even when you think a file holds a
+single change. Reviewing each hunk before you stage it is
+the cheapest code review available: it is the last moment
+you see the change before it enters history, and it
+routinely catches a stray `print()`, a commented-out line,
+or a debugging edit you meant to remove.
+:::
+
+### Splitting and editing hunks
+
+Two adjacent changes sometimes fall within a single hunk,
+with no unchanged line between them for Git to split on.
+Pressing `s` then does nothing useful. The `e` command is
+the fallback: it opens the hunk in your editor, where each
+line is prefixed by `+` (an added line), `-` (a removed
+line), or a space (context). To stage only some lines,
+delete the lines you do not want from the patch, following
+the rule Git prints in the editor: to exclude an added
+(`+`) line, delete it; to keep a removed (`-`) line out of
+the commit, change its `-` to a space. Save and close, and
+Git stages exactly the edited patch.
+
+Editing hunks by hand is fiddly and error-prone; use it only
+when a hunk genuinely cannot be split. Most of the time,
+committing more often in the first place avoids the need.
+
+::: {.callout-note icon=false collapse=true}
+## Check your understanding: what does -p operate on?
+
+You run `git add -p` with no filename in a repository where
+three files have changed. What happens?
+
+Git walks the hunks of all three changed tracked files in
+turn, prompting for each. The `-p` flag is not tied to a
+single file; naming a file (`git add -p analysis.R`) simply
+restricts the walk to that file. When you have edits across
+several files and want to assemble one logical commit that
+spans some of them, running `git add -p` with no argument
+lets you pick the relevant hunks from each. Note that
+patch mode considers only tracked files; a brand-new,
+untracked file has no diff to present and must be added
+whole with `git add <file>`.
+:::
+
+### Discarding and unstaging selectively
+
+Patch mode is not limited to staging. Two companions apply
+the same hunk-by-hunk selection to the reverse operations.
+
+To **unstage** selected hunks, that is, to move them back out
+of the staging area while keeping the changes in your working
+directory, use patch mode on `git restore --staged`:
+
+```bash
+$ git restore --staged -p analysis.R
+```
+
+The prompt now asks, for each staged hunk, whether to unstage
+it (`y` unstages). Nothing in your working directory is lost;
+only the staging area changes.
+
+To **discard** selected hunks, that is, to throw away
+uncommitted changes in the working directory, use patch mode
+on `git restore`:
+
+```bash
+$ git restore -p analysis.R
+```
+
+Here `y` discards the hunk. This is destructive: a discarded
+uncommitted hunk is gone, with no reflog entry to recover it,
+because it was never committed. Use it to drop an
+experimental edit you have decided against, and read the next
+warning first.
+
+::: {.callout-warning}
+## Warning
+
+`git restore -p` and `git restore <file>` permanently discard
+uncommitted changes. Unlike almost everything in Day 2 and
+Day 3, this cannot be undone through the reflog, because
+uncommitted work is not in the object database at all. Before
+discarding anything you are unsure about, either commit it to
+a scratch branch or stash it (below); both are recoverable,
+whereas a discard is not.
+:::
+
+### Shelving work in progress with git stash
+
+The second recurring problem of the early weeks is the
+interruption. You are halfway through an edit, the code does
+not yet run, and something urgent arrives: a colleague needs
+a quick fix on `main`, or you must switch branches to check a
+result. Your working directory is too unfinished to commit,
+but switching branches would carry the mess with you.
+
+`git stash` solves this. It records your uncommitted changes
+(both staged and unstaged) onto a stack, then reverts the
+working directory to the last commit, leaving you clean:
+
+```bash
+$ git status --short
+ M analysis.R
+ M report.qmd
+$ git stash
+Saved working directory and index state WIP on main: 7d9f0b3 Add change-in-HbA1c table by sex
+$ git status
+On branch main
+nothing to commit, working tree clean
+```
+
+Your changes are not lost; they are on the stash stack. Do
+the urgent work, commit it, then bring your changes back with
+`git stash pop`, which reapplies the most recent stash and
+removes it from the stack:
+
+```bash
+$ git stash pop
+On branch main
+Changes not staged for commit:
+	modified:   analysis.R
+	modified:   report.qmd
+Dropped refs/stash@{0} (a3c5e70...)
+```
+
+You are back exactly where you left off. Useful variants:
+
+- `git stash list` shows the stack; each entry is
+  `stash@{0}`, `stash@{1}`, and so on, newest first.
+- `git stash push -m 'half-done sensitivity analysis'`
+  records a stash with a description, so a stash you keep for
+  more than a few minutes remains intelligible.
+- `git stash push <path>` stashes only the named files.
+- `git stash -u` also stashes untracked files (by default
+  they stay in the working directory).
+- `git stash apply` reapplies a stash but leaves it on the
+  stack, in case you need it again; `git stash drop` then
+  removes it explicitly.
+- `git stash branch <name>` creates a new branch from the
+  commit the stash was made on and applies the stash there,
+  which is the clean way to resume a stash that no longer
+  applies to a moved-on branch.
+
+::: {.callout-warning}
+## Warning
+
+The stash is a stack, and it is easy to forget. A stash has
+no branch, no message unless you supplied one, and does not
+appear in `git status`. Work stashed 'for a minute' and left
+for a week is a common way to lose track of changes. If an
+interruption will last longer than the walk to the coffee
+machine, prefer a work-in-progress commit on a branch, as
+described next; it is visible, named, and recoverable.
+:::
+
+### Stash or commit? A rule of thumb
+
+Both stashing and a work-in-progress commit let you set work
+aside. They differ in visibility and durability. A stash is
+convenient and quick but invisible to `git status` and
+detached from any branch. A work-in-progress commit is a
+first-class, named, recoverable object.
+
+The working rule: **stash for a brief context switch you
+will reverse within minutes; commit for anything longer.**
+When you must switch branches to answer a colleague's
+question and will return immediately, stash. When you are
+stopping for the day, or the interruption is substantial,
+make a commit on your feature branch with a frank message:
+
+```bash
+$ git commit -am 'WIP: subgroup analysis, do not review'
+```
+
+A work-in-progress commit is not a blemish; it can be folded
+into a clean commit later with the interactive rebase you
+will learn on Day 2. The history you publish is what must be
+clean, not every intermediate state on your own branch.
+
+## Worked example: two changes, one interruption
+
+The running `trial-analysis` repository is on `main` with a
+clean history. You begin a working session on `analysis.R`
+and make two unrelated edits: you correct a filtering
+threshold that was excluding eligible participants, and,
+separately, you start a new age-subgroup table that is not
+yet finished. Then a co-investigator emails: the enrollment
+count in yesterday's summary looks wrong, can you check it
+now.
+
+Inspect the state. Two hunks, one finished and one not:
+
+```bash
+$ git diff --stat
+ analysis.R | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+```
+
+First, commit only the finished change, the threshold fix,
+using patch mode:
+
+```bash
+$ git add -p analysis.R
+(1/2) Stage this hunk [y,n,q,a,d,s,e,?]? y
+(2/2) Stage this hunk [y,n,q,a,d,s,e,?]? n
+$ git commit -m 'Correct age-eligibility threshold to >= 18'
+[main 9a1c3e5] Correct age-eligibility threshold to >= 18
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+The unfinished subgroup table remains in the working
+directory. You cannot commit it, it does not run yet, but you
+must switch context to check the co-investigator's number.
+Stash the remainder:
+
+```bash
+$ git stash push -m 'unfinished age-subgroup table'
+Saved working directory and index state On main: unfinished age-subgroup table
+$ git status
+On branch main
+nothing to commit, working tree clean
+```
+
+With a clean tree you investigate the enrollment count,
+find and commit a fix:
+
+```bash
+$ git add -p summary.R
+(1/1) Stage this hunk [y,n,q,a,d,s,e,?]? y
+$ git commit -m 'Count enrolled, not screened, participants'
+[main b3d5f70] Count enrolled, not screened, participants
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+Now resume the subgroup work exactly where you left it:
+
+```bash
+$ git stash pop
+On branch main
+Changes not staged for commit:
+	modified:   analysis.R
+Dropped refs/stash@{0} (c7e9a12...)
+$ git log --oneline -3
+b3d5f70 Count enrolled, not screened, participants
+9a1c3e5 Correct age-eligibility threshold to >= 18
+7d9f0b3 Add change-in-HbA1c table by sex
+```
+
+The history records two clean, separately intelligible fixes;
+the co-investigator's question was answered without losing
+the in-progress table; and no unrelated changes were bundled
+together. This is the everyday value of selective staging and
+the stash.
+
+## Homework
+
+Work in a scratch repository. Create one and seed it with a
+short R script so that you have something to edit:
+
+```bash
+mkdir stash-practice
+cd stash-practice
+git init
+printf 'x <- 1\ny <- 2\nz <- 3\n' > script.R
+git add script.R
+git commit -m 'Initial script'
+```
+
+1. **Two hunks, two commits.** Edit `script.R` so that it has
+   two separated changes: change the first line and, leaving
+   the middle line untouched, change the last line. Use
+   `git add -p` to stage and commit each change as its own
+   commit with a distinct message. Confirm with
+   `git log --oneline` that you produced two commits.
+
+2. **Stage across a gap.** In a single edit, add a new line
+   after line 1 and another new line after line 3. Run
+   `git add -p` and stage only the first of the two new
+   lines. What does `git diff --staged` show, and what does
+   `git diff` (the unstaged remainder) show?
+
+3. **Unstage selectively.** Stage all changes to `script.R`
+   with `git add script.R`, then use `git restore --staged
+   -p` to unstage one hunk while keeping the other staged.
+   Confirm the split with `git status`. Did any change leave
+   your working directory?
+
+4. **Discard, and reflect on danger.** Make an edit to
+   `script.R` that you decide you do not want. Discard it
+   with `git restore script.R`. Then attempt to recover it.
+   Can you? Explain, in one or two sentences, why or why not.
+
+5. **A clean interruption.** Begin an edit to `script.R`,
+   leaving it unfinished. Without committing, stash it with a
+   descriptive message. Create a file `hotfix.txt`, commit
+   it, then restore your stashed work and confirm it is back.
+   Show the output of `git stash list` before and after the
+   restore.
+
+6. **Stash only some files.** Modify both `script.R` and a
+   new tracked file `notes.txt` (create and commit it first).
+   Stash only `notes.txt` using `git stash push notes.txt`.
+   Confirm that `script.R` remains modified in the working
+   directory while `notes.txt` is clean.
+
+7. **Stash or commit?** For each of the following, state
+   whether you would stash or make a work-in-progress commit,
+   and why: (a) you need to switch branches for thirty
+   seconds to read a colleague's code; (b) you are stopping
+   work for the weekend mid-change; (c) you want to run the
+   test suite against a clean version of the last commit
+   without losing your current edits.
+
+## Solutions
+
+**Problem 1.**
+
+```bash
+# Edit script.R: line 1 'x <- 1' -> 'x <- 10'
+#                line 3 'z <- 3' -> 'z <- 30'
+git add -p script.R
+#> (1/2) Stage this hunk? y
+#> (2/2) Stage this hunk? n
+git commit -m 'Change x to 10'
+git add script.R
+git commit -m 'Change z to 30'
+git log --oneline
+#> 3rd... Change z to 30
+#> 2nd... Change x to 10
+#> 1st... Initial script
+```
+
+The unchanged middle line gives Git the gap it needs to
+present the two edits as separate hunks, so patch mode can
+stage them independently.
+
+**Problem 2.** After staging only the first new line,
+`git diff --staged` shows the insertion after line 1, and
+`git diff` shows the still-unstaged insertion after line 3.
+The single edit has been split across the staging boundary:
+part is staged, part remains in the working directory. This
+is the same staged-versus-modified split the boot camp
+introduced, now applied at the level of individual hunks
+rather than whole files.
+
+**Problem 3.**
+
+```bash
+git add script.R
+git restore --staged -p script.R
+#> (1/2) Unstage this hunk? y
+#> (2/2) Unstage this hunk? n
+git status
+#> Changes to be committed:
+#>	modified:   script.R
+#> Changes not staged for commit:
+#>	modified:   script.R
+```
+
+No change left the working directory. `git restore --staged`
+moves changes from the staging area back to the working
+directory; it never discards them. The file appears under
+both headings because one hunk is staged and one is not.
+
+**Problem 4.** You cannot recover it. `git restore script.R`
+overwrites the working-directory copy with the version from
+the last commit, and the discarded edit was never committed
+or stashed, so it exists nowhere in Git's object database.
+The reflog, which rescues committed work on Day 3, cannot
+help, because it tracks commits and branch tips, not
+uncommitted working-directory changes. This is the one truly
+unrecoverable class of loss in Git, and the reason the
+lecture warns against `restore` on changes you are unsure
+about.
+
+**Problem 5.**
+
+```bash
+# begin editing script.R, leave unfinished
+git stash push -m 'half-done refactor of script.R'
+git stash list
+#> stash@{0}: On main: half-done refactor of script.R
+echo 'urgent fix' > hotfix.txt
+git add hotfix.txt
+git commit -m 'Add hotfix'
+git stash pop
+git stash list
+#> (empty)
+```
+
+Before the restore the stash list has one entry; after
+`git stash pop` it is empty, because `pop` reapplies the
+stash and removes it from the stack. The unfinished edit to
+`script.R` is back in the working directory.
+
+**Problem 6.**
+
+```bash
+printf 'first note\n' > notes.txt
+git add notes.txt
+git commit -m 'Add notes'
+# modify both script.R and notes.txt
+git stash push notes.txt
+git status --short
+#>  M script.R
+```
+
+Only `notes.txt` was stashed, so `script.R` remains modified
+in the working directory and `notes.txt` is clean. Path-
+limited stashing is the tool for setting aside one file's
+changes while continuing on another.
+
+**Problem 7.**
+
+(a) **Stash.** A thirty-second context switch you will
+reverse immediately is the exact case the stash is for.
+
+(b) **Commit** (a work-in-progress commit on your branch).
+An interruption spanning a weekend is far too long for an
+invisible stash; a named commit is visible in the log,
+attached to the branch, and recoverable, and it can be
+folded into a clean commit later with Day 2's interactive
+rebase.
+
+(c) **Stash** (or `git stash --keep-index`). You want a
+clean working tree matching the last commit temporarily,
+then your edits back. Stashing gives you exactly that;
+`git stash pop` afterwards restores the edits. A commit would
+also work but is heavier than the moment requires.
+
+## What's next
+
+Today you learned to assemble clean commits as you go and to
+set work aside safely. Day 2 turns to history that is already
+recorded but not yet clean: amending the last commit,
+and using interactive rebase to reword, reorder, squash, and
+drop earlier commits, so that a branch of work-in-progress
+commits becomes a sequence a reviewer can read. It also fixes
+the boundary that governs all of this, namely when rewriting
+is safe and when it is forbidden. Keep the `trial-analysis`
+repository; Day 2 continues from here.

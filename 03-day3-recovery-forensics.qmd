@@ -1,0 +1,933 @@
+# Day 3: Recovery and Forensics {#sec-day3}
+
+## Learning objectives
+
+By the end of this day you should be able to:
+
+- Explain what `git reflog` records, namely every position
+  `HEAD` and each branch tip has held, and why this makes
+  most committed work recoverable.
+- Read a reflog listing, interpreting `HEAD@{0}`,
+  `HEAD@{1}`, and the operation labels beside each entry.
+- Recover from an accidental `git reset --hard`, from a
+  commit orphaned by an interactive rebase, and from a
+  deleted branch, using the reflog to find the lost commit.
+- State precisely the one class of loss the reflog cannot
+  reverse, namely uncommitted working-directory changes.
+- Locate the commit that introduced a change in a computed
+  result with `git bisect`, both by hand and with
+  `git bisect run`.
+- Investigate how a line reached its current form with
+  `git blame`, the pickaxe (`git log -S` and `git log -G`),
+  and `git log -L`.
+
+## Lecture
+
+### The safety net beneath Day 2
+
+Day 2 asked you to rewrite history: to amend, reorder,
+squash, and drop commits. Each of those operations replaces
+a commit with a new one and leaves the original with no
+branch pointing at it. If `git rebase -i` builds the wrong
+result, or a `git reset --hard` lands on the wrong commit,
+where does the displaced work go?
+
+Nowhere. A commit that no branch and no tag points to is
+unreferenced, not deleted; Git keeps it in the object
+database until garbage collection eventually prunes it, and
+it records the fact that `HEAD` once pointed there. That
+record is the reflog, and it is the reason the rewriting of
+Day 2 is safe. Today you learn to read it and recover
+through it, then turn from recovery to forensics, that is,
+the commands that reconstruct how a repository reached its
+present state.
+
+### What the reflog records
+
+The **reflog** (reference log) is a local, per-repository
+journal of where references have pointed over time. There
+is one for `HEAD` and one for each branch. Every time `HEAD`
+moves, that is, on every commit, checkout, reset, merge,
+rebase step, amend, or pull, Git appends a line to the
+`HEAD` reflog recording the new position and the operation
+that caused the move.
+
+The essential properties to fix in mind:
+
+- It records **commits and reference positions**, not
+  uncommitted edits. Work you never committed is not in it.
+- It is **local**. The reflog lives in
+  `.git/logs/` and is never pushed or fetched. A fresh
+  clone has an empty reflog; your collaborator cannot see
+  yours.
+- Entries **expire**. By default, reachable entries are kept
+  90 days and unreachable ones 30 days
+  (`gc.reflogExpire` and `gc.reflogExpireUnreachable`).
+  Recovery is a prompt operation, not an archival one.
+
+### Reading the reflog
+
+Run `git reflog` (a shorthand for
+`git reflog show HEAD`) in the `trial-analysis` repository:
+
+```bash
+$ git reflog
+b3d5f70 (HEAD -> main) HEAD@{0}: commit: Count enrolled, not screened, participants
+9a1c3e5 HEAD@{1}: commit: Correct age-eligibility threshold to >= 18
+7d9f0b3 HEAD@{2}: commit: Add change-in-HbA1c table by sex
+5f3e9c1 HEAD@{3}: commit: Add primary endpoint computation
+2b7c1a0 HEAD@{4}: commit (initial): Import trial data and codebook
+```
+
+Read it as newest-first. Each line has three parts: the
+commit the reference moved to, the selector `HEAD@{n}`
+naming the position `n` moves ago, and a label describing
+the operation. `HEAD@{0}` is always where `HEAD` is now;
+`HEAD@{1}` is where it was one move ago, and so on. The
+selector is usable anywhere a commit is expected, so
+`git show HEAD@{2}` shows the commit `HEAD` pointed at two
+moves back, and `git diff HEAD@{3} HEAD@{0}` compares then
+with now.
+
+The labels matter, because they tell you what happened.
+`commit` is an ordinary commit; you will also see
+`reset:`, `rebase (start):`, `rebase (finish):`,
+`checkout:`, `commit (amend):`, and `pull:`. When you are
+hunting for lost work, the label is how you recognise the
+move that lost it.
+
+::: {.callout-note icon=false collapse=true}
+## Check your understanding: what does amend leave in the reflog?
+
+You commit, then immediately run `git commit --amend` to fix
+the message. How many entries does this add to the `HEAD`
+reflog, and can you still reach the pre-amend commit?
+
+Two moves are recorded: the original `commit`, then a
+`commit (amend):` entry for the replacement. Amend does not
+edit a commit in place; it writes a new commit and moves
+`HEAD` to it, orphaning the original. The original is still
+in the object database and still named by its reflog entry,
+so `git show HEAD@{1}` (or the original's hash) reaches it.
+This is exactly why an amend you regret is recoverable: the
+superseded commit is orphaned, not destroyed.
+:::
+
+### Recovery 1: an accidental reset --hard
+
+The classic disaster. You mean to discard the last commit
+but mistype the count, or you run `git reset --hard` against
+the wrong target, and two commits of work vanish from the
+branch:
+
+```bash
+$ git reset --hard HEAD~2
+HEAD is now at f81d2a9 Update report figures and caption
+$ git log --oneline -1
+f81d2a9 Update report figures and caption
+```
+
+The two commits are gone from `main`, but not from the
+reflog. Look:
+
+```bash
+$ git reflog
+f81d2a9 (HEAD -> main) HEAD@{0}: reset: moving to HEAD~2
+3c9a1f7 HEAD@{1}: commit: Document corrected eligibility threshold
+a70e5d2 HEAD@{2}: commit: Add unit test for threshold filter
+f81d2a9 HEAD@{3}: commit: Update report figures and caption
+```
+
+`HEAD@{1}` is the branch tip as it stood immediately before
+the reset, namely the commit you wanted to keep. The reset
+moved only the `main` pointer; the commits themselves are
+untouched and still named by the reflog:
+
+```text
+before:  f81d2a9 -- a70e5d2 -- 3c9a1f7
+                                   |
+                                  main  (HEAD@{1})
+
+after:   f81d2a9 -- a70e5d2 -- 3c9a1f7   (orphaned, in reflog)
+            |
+           main  (HEAD@{0})
+```
+
+Two ways to recover, one destructive-looking and one
+cautious.
+
+The direct route moves the branch back to that tip:
+
+```bash
+$ git reset --hard HEAD@{1}
+HEAD is now at 3c9a1f7 Document corrected eligibility threshold
+```
+
+The cautious route, preferable when you are not certain, does
+not touch `main` at all. It creates a new branch at the lost
+commit so you can inspect it before deciding:
+
+```bash
+$ git branch recovered HEAD@{1}
+$ git log --oneline recovered -2
+3c9a1f7 Document corrected eligibility threshold
+a70e5d2 Add unit test for threshold filter
+```
+
+Recovery never requires typing a forty-character hash from
+memory. If you can point at the commit in the reflog, you can
+point a branch at it.
+
+### Recovery 2: a commit orphaned by interactive rebase
+
+Day 2 warned that dropping a line in the `git rebase -i` to-do
+list deletes that commit from the branch. Suppose during a
+squash you deleted the wrong line and lost a commit named
+`Add subgroup sensitivity analysis`. It is not on the
+rebased branch, but the rebase recorded its passage:
+
+```bash
+$ git reflog
+d4f0a19 (HEAD -> main) HEAD@{0}: rebase (finish): returning to refs/heads/main
+d4f0a19 HEAD@{1}: rebase (pick): Update report figures and caption
+6b2c8e3 HEAD@{2}: rebase (start): checkout main~4
+e8a1c05 HEAD@{3}: commit: Add subgroup sensitivity analysis
+c1e8f42 HEAD@{4}: commit: Add sensitivity analysis on complete cases
+```
+
+The `rebase (start):` entry marks where the rebase began;
+the commit just above it in real time, `e8a1c05`, is the one
+the rebase omitted. Recover it by cherry-picking it back onto
+the current branch:
+
+```bash
+$ git cherry-pick e8a1c05
+[main 5a9d3c1] Add subgroup sensitivity analysis
+ 1 file changed, 12 insertions(+)
+```
+
+If you would rather examine it in isolation first, branch it
+as before with `git branch recovered e8a1c05` and inspect,
+then merge or cherry-pick when satisfied. Either way, the
+reflog turned an irreversible-looking rebase mistake into a
+one-line fix.
+
+### Recovery 3: a deleted branch
+
+Deleting a branch removes only the pointer, not the commits
+it named. If you delete a feature branch that was never
+merged, Git even warns you and prints the tip hash:
+
+```bash
+$ git branch -D age-subgroups
+Deleted branch age-subgroups (was 7c1b9f4).
+```
+
+Should you want it back, the tip hash in that message is
+enough:
+
+```bash
+$ git branch age-subgroups 7c1b9f4
+```
+
+If the message has scrolled away, the `HEAD` reflog still
+holds the `checkout:` entries from when you worked on the
+branch, and each branch keeps its own reflog until deletion.
+Searching the `HEAD` reflog for the last commit you made
+there recovers the tip:
+
+```bash
+$ git reflog | grep age-subgroups
+7c1b9f4 HEAD@{9}: commit: Add age-stratified change table
+```
+
+Point a branch at `7c1b9f4` and the work is restored.
+
+::: {.callout-warning}
+## Warning
+
+The reflog cannot recover uncommitted work. Changes you never
+committed, whether discarded by `git restore`, overwritten by
+`git checkout`, or wiped by `git reset --hard`, were never
+written to the object database and leave no reflog entry.
+This is the same irreducible loss Day 1 flagged for
+`git restore -p`, and it is the only class of loss in this
+book that no command reverses. The reflog protects commits,
+not working-directory edits. If work matters, commit it, if
+only to a scratch branch, before running any `--hard`
+operation.
+:::
+
+::: {.callout-warning}
+## Warning
+
+Do not treat the reflog as a backup. It is local, so it
+vanishes with the machine or the working copy; it is not
+pushed, so a collaborator's clone cannot restore your lost
+commit; and its entries expire, so a rewrite you regret in
+four months may already be pruned. The reflog is a
+short-horizon safety net for the operations of this book, not
+a substitute for pushing to a remote and, in due course, the
+backup and archival practice the Practicum covers.
+:::
+
+### From recovery to forensics
+
+The reflog answers 'how do I get my work back'. The rest of
+today answers a different question: 'how did the repository
+come to be as it is'. In statistical practice the trigger is
+almost always a number that moved. A figure in this week's
+report disagrees with last week's; a count in a table is not
+what a co-investigator remembers; a p-value crossed a
+threshold. Some commit changed it, and you must find which,
+understand what it did, and decide whether it was correct.
+Git provides three complementary instruments for this:
+`git bisect` to find the commit, `git blame` and the pickaxe
+to find the line and its history, and `git show` to read the
+commit once you have it.
+
+### Finding the culprit commit with git bisect
+
+When a result changed and you do not know which of many
+commits changed it, `git bisect` performs a binary search
+over the history. You mark one commit where the result was
+correct (`good`) and one where it is wrong (`bad`); Git
+checks out the midpoint, you test it and report `good` or
+`bad`, and Git halves the remaining range each time. Over a
+hundred commits it converges in about seven tests.
+
+Frame it concretely. The mean twelve-week change in HbA1c
+was reported as `-0.84` last week and is `-0.71` today, and
+you want the commit that moved it. Start a bisect, mark the
+current (broken) state bad and last week's tagged release
+good:
+
+```bash
+$ git bisect start
+$ git bisect bad
+$ git bisect good 2b7c1a0
+Bisecting: 2 revisions left to test after this (roughly 2 steps)
+[b3d5f70] Count enrolled, not screened, participants
+```
+
+Git has checked out the midpoint commit `b3d5f70`. Test it,
+that is, run the analysis and read the value:
+
+```bash
+$ Rscript analysis.R
+[1] -0.71
+```
+
+Still wrong, so this commit is bad:
+
+```bash
+$ git bisect bad
+Bisecting: 1 revision left to test after this (roughly 1 step)
+[7d9f0b3] Add change-in-HbA1c table by sex
+```
+
+Test the new midpoint:
+
+```bash
+$ Rscript analysis.R
+[1] -0.84
+```
+
+Correct, so this commit is good:
+
+```bash
+$ git bisect good
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[9a1c3e5] Correct age-eligibility threshold to >= 18
+```
+
+One commit remains between the last good and the first bad.
+Test it; the value is `-0.71`, so it is bad, and Git has its
+answer:
+
+```bash
+$ git bisect bad
+9a1c3e5 is the first bad commit
+commit 9a1c3e5...
+    Correct age-eligibility threshold to >= 18
+ analysis.R | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+The search is over. When you finish, always end the session,
+which returns `HEAD` to where you started and restores the
+branch:
+
+```bash
+$ git bisect reset
+Previous HEAD position was 9a1c3e5 Correct age-eligibility threshold to >= 18
+Switched to branch 'main'
+```
+
+Note that `git bisect` does not tell you the change was
+wrong, only which commit is responsible. Whether lowering
+the age-eligibility threshold to 18 was correct is a
+scientific judgement; bisect has narrowed a hundred
+candidates to one so you can make it.
+
+#### Automating with git bisect run
+
+Testing each midpoint by hand is tedious and, worse,
+error-prone: a moment's inattention and you mark a commit
+`good` that was bad, corrupting the search. If you can
+express the test as a script that exits `0` when the state is
+good and non-zero when it is bad, `git bisect run` performs
+every step for you. Write a check script, `check-mean.R`,
+that recomputes the value and sets the exit status:
+
+```r
+source("analysis.R")
+target <- -0.84
+q(status = if (abs(mean_change - target) < 0.01) 0 else 1)
+```
+
+Then hand it to bisect after marking the endpoints:
+
+```bash
+$ git bisect start
+$ git bisect bad
+$ git bisect good 2b7c1a0
+$ git bisect run Rscript check-mean.R
+```
+
+Git checks out each midpoint, runs the script, reads its exit
+status as the `good`/`bad` verdict, and drives the search to
+completion unattended, printing `<hash> is the first bad
+commit` at the end. Follow with `git bisect reset` as before.
+An automated bisect over a script is the closest Git comes to
+answering 'which commit broke this' with a single command.
+
+::: {.callout-note icon=false collapse=true}
+## Check your understanding: which endpoint is good?
+
+A result was correct in an old commit and is wrong now. When
+you start a bisect, which endpoint do you mark `good` and
+which `bad`, and what would happen if you swapped them?
+
+Mark the current, wrong state `bad` and the old, correct
+commit `good`; here `bad` means 'exhibits the change you are
+tracing' and `good` means 'does not yet'. The labels are
+arbitrary tokens for the two sides of a transition, not moral
+judgements, but they must be consistent with how your test
+decides. If you swap them, Git searches the wrong direction,
+assumes the property appeared going backwards in time, and
+either reports a nonsensical 'first bad commit' or complains
+that the good commit is a descendant of the bad one. With
+`git bisect run`, swapping is equivalent to inverting the
+script's exit status, and the reported culprit is meaningless.
+:::
+
+### Reading a line's history with git blame
+
+Bisect finds the commit; `git blame` finds the line.
+`git blame <file>` annotates every line of a file with the
+commit, author, and timestamp that last changed it. On a long
+file the full output is unwieldy, so restrict it to a range
+with `-L <start>,<end>`. Suppose you are asking 'why is the
+eligibility threshold 18, and when did it become that':
+
+```bash
+$ git blame -L 8,11 analysis.R
+9a1c3e5a (Rex Thomas 2026-07-18 09:14:02 -0700  8) dat <- dat |>
+9a1c3e5a (Rex Thomas 2026-07-18 09:14:02 -0700  9)   filter(age >= 18)
+5f3e9c10 (Rex Thomas 2026-07-10 11:02:55 -0700 10)
+5f3e9c10 (Rex Thomas 2026-07-10 11:02:55 -0700 11) mean_change <- dat |>
+```
+
+Line 9, the `filter(age >= 18)`, was last touched by
+`9a1c3e5`, on 18 July, the same commit bisect identified. The
+neighbouring lines are older, from `5f3e9c1`. Blame has told
+you when the threshold reached its current value and in which
+commit to look for the reasoning.
+
+Blame reports only the **last** change to each line. If the
+threshold was 21, then 18, then back to 18 after a revert,
+blame shows only the most recent commit; the earlier history
+is invisible to it. To follow a line across every change, use
+`git log -L`, below. And note what blame does not provide:
+the commit's author and message may explain why the change
+was made, but blame itself answers only who, what, and when,
+never why. For why you must read the commit.
+
+::: {.callout-tip}
+## Tip
+
+If blame points at a commit that merely reformatted the file,
+reindented it, or renamed a variable throughout, the answer
+you want is one change further back. `git blame` accepts a
+starting commit: `git blame 9a1c3e5~1 -L 8,11 analysis.R`
+re-runs the blame as of the parent of the noise commit,
+skipping past it. Repeating this walks backward through
+cosmetic changes to the commit that last altered the logic.
+:::
+
+### The pickaxe and line-log
+
+Blame starts from a line and looks back one step. Often you
+want the opposite: start from a string or a value and find
+every commit that touched it. This is the **pickaxe**.
+
+`git log -S '<string>'` lists the commits that changed the
+number of occurrences of the exact string, that is, the
+commits that added or removed it. To find when `na.rm = TRUE`
+first entered the analysis:
+
+```bash
+$ git log -S 'na.rm = TRUE' --oneline -- analysis.R
+5c7e9a1 Fix missing na.rm in HbA1c mean
+```
+
+One commit added the string, so one commit is reported.
+`-S` counts occurrences, so a commit that moves the string
+without changing how many times it appears is, deliberately,
+not reported; you are asking 'when did this appear or
+disappear', not 'when was this line touched'.
+
+For a pattern rather than a fixed string, `git log -G
+'<regex>'` reports every commit whose diff contains an added
+or removed line matching the regular expression, whether or
+not the count changed. To trace all edits touching the
+eligibility threshold, whatever its value:
+
+```bash
+$ git log -G 'filter\(age' --oneline -- analysis.R
+9a1c3e5 Correct age-eligibility threshold to >= 18
+5f3e9c1 Add primary endpoint computation
+```
+
+Both commits that touched the filter are reported: the one
+that introduced it and the one that changed the threshold.
+
+Finally, `git log -L <start>,<end>:<file>` reconstructs the
+complete history of a specific line range, showing each
+commit that changed it together with the diff it applied. It
+answers 'show me everything that ever happened to these
+lines':
+
+```bash
+$ git log -L 9,9:analysis.R
+commit 9a1c3e5...
+    Correct age-eligibility threshold to >= 18
+@@ -9,1 +9,1 @@
+-  filter(age >= 21)
++  filter(age >= 18)
+
+commit 5f3e9c1...
+    Add primary endpoint computation
+@@ -0,0 +1,1 @@
++  filter(age >= 21)
+```
+
+Now the full story is visible: `5f3e9c1` introduced the line
+with a threshold of 21, and `9a1c3e5` changed it to 18. This
+is what blame could not show, because blame reports only the
+most recent change. Between the pickaxe, which finds commits
+by content, and `-L`, which follows a line through time, you
+can reconstruct the provenance of any value in an analysis.
+
+### Reading the commit with git show
+
+Bisect, blame, and the pickaxe all end by handing you a
+commit hash. The command that reads it is `git show <hash>`,
+from the boot camp: it prints the commit's metadata, message,
+and full diff. Having identified `9a1c3e5`, read it:
+
+```bash
+$ git show 9a1c3e5
+commit 9a1c3e5...
+Author: Rex Thomas <rgthomas@ucsd.edu>
+Date:   Sat Jul 18 09:14:02 2026 -0700
+
+    Correct age-eligibility threshold to >= 18
+
+diff --git a/analysis.R b/analysis.R
+@@ -8,3 +8,3 @@ dat <- read.csv("data-raw/trial.csv")
+ dat <- dat |>
+-  filter(age >= 21)
++  filter(age >= 18)
+```
+
+The message states the intent and the diff shows the act. The
+threshold moved from 21 to 18, which admitted the 18-to-20
+age band into the analysis population and shifted the mean
+change. Whether that was the correct eligibility criterion is
+now a question for the protocol, not for Git, and the
+investigation is complete.
+
+## Worked example: a number that moved
+
+The `trial-analysis` repository is on `main`. In this week's
+report the primary result, the mean twelve-week change in
+HbA1c, reads `-0.71`; last week's archived report gave
+`-0.84`. No one recalls changing the analysis. You will find
+the responsible commit, understand it, and, along the way,
+recover a commit a collaborator lost to a stray reset.
+
+First, confirm the current value and reproduce the
+discrepancy:
+
+```bash
+$ Rscript analysis.R
+[1] -0.71
+```
+
+Last week's value came from the release tagged `2b7c1a0`.
+Use it as the known-good endpoint and bisect:
+
+```bash
+$ git bisect start
+$ git bisect bad
+$ git bisect good 2b7c1a0
+Bisecting: 2 revisions left to test after this (roughly 2 steps)
+[b3d5f70] Count enrolled, not screened, participants
+$ Rscript analysis.R
+[1] -0.71
+$ git bisect bad
+Bisecting: 1 revision left to test after this (roughly 1 step)
+[7d9f0b3] Add change-in-HbA1c table by sex
+$ Rscript analysis.R
+[1] -0.84
+$ git bisect good
+Bisecting: 0 revisions left to test after this (roughly 0 steps)
+[9a1c3e5] Correct age-eligibility threshold to >= 18
+$ Rscript analysis.R
+[1] -0.71
+$ git bisect bad
+9a1c3e5 is the first bad commit
+```
+
+Three tests converged on `9a1c3e5`. End the session:
+
+```bash
+$ git bisect reset
+Switched to branch 'main'
+```
+
+Now understand what `9a1c3e5` did. Read the commit, then
+confirm the line with a focused blame:
+
+```bash
+$ git show 9a1c3e5 --stat
+    Correct age-eligibility threshold to >= 18
+ analysis.R | 2 +-
+$ git blame -L 8,9 analysis.R
+9a1c3e5a (Rex Thomas 2026-07-18 09:14:02 -0700  8) dat <- dat |>
+9a1c3e5a (Rex Thomas 2026-07-18 09:14:02 -0700  9)   filter(age >= 18)
+```
+
+The commit lowered the eligibility threshold from 21 to 18,
+enlarging the analysis population and moving the mean. The
+number moved for a documented reason; the report needs only a
+note that the eligibility criterion changed between the two
+analyses. The forensic question is answered.
+
+While preparing the correction, a collaborator on the same
+clone runs a reset against the wrong commit and reports that
+`Document corrected eligibility threshold` has disappeared
+from `main`:
+
+```bash
+$ git log --oneline -1
+f81d2a9 Update report figures and caption
+```
+
+The commit is not on the branch, but the reflog holds the
+tip as it stood before the reset:
+
+```bash
+$ git reflog
+f81d2a9 (HEAD -> main) HEAD@{0}: reset: moving to HEAD~2
+3c9a1f7 HEAD@{1}: commit: Document corrected eligibility threshold
+a70e5d2 HEAD@{2}: commit: Add unit test for threshold filter
+f81d2a9 HEAD@{3}: commit: Update report figures and caption
+```
+
+`HEAD@{1}` is the lost tip. Recover cautiously by branching
+it first, verifying the contents, then fast-forwarding `main`:
+
+```bash
+$ git branch recovered HEAD@{1}
+$ git log --oneline recovered -2
+3c9a1f7 Document corrected eligibility threshold
+a70e5d2 Add unit test for threshold filter
+$ git reset --hard recovered
+HEAD is now at 3c9a1f7 Document corrected eligibility threshold
+$ git branch -d recovered
+```
+
+Both commits are back on `main`. In one session you located
+the commit that moved a headline result, established that the
+move was intended, and recovered a colleague's work that a
+mistaken reset had displaced. The forensic commands found the
+cause; the reflog undid the accident.
+
+## Homework
+
+Work in a scratch repository with a history long enough to
+search. The following seeds one where a computed value changes
+at a known commit, so you can rediscover it:
+
+```bash
+mkdir bisect-practice
+cd bisect-practice
+git init
+printf 'threshold <- 21\nx <- c(19, 20, 22, 25, 30)\ncat(mean(x[x >= threshold]), "\\n")\n' > compute.R
+git add compute.R
+git commit -m 'Add computation with threshold 21'
+printf 'first\n' > notes.txt && git add notes.txt && git commit -m 'Add notes'
+printf 'second\n' >> notes.txt && git commit -am 'Extend notes'
+sed 's/threshold <- 21/threshold <- 18/' compute.R > tmp && mv tmp compute.R
+git commit -am 'Lower threshold to 18'
+printf 'third\n' >> notes.txt && git commit -am 'Extend notes again'
+```
+
+Running `Rscript compute.R` prints `25.75` at the tip and
+`25.66667` before the threshold change. The first commit is
+the known-good state.
+
+1. **Read your own history.** Run `git reflog` and identify
+   the entry for the very first commit and the entry for the
+   current tip. What selector (`HEAD@{n}`) names each, and
+   what does the label on the tip entry say?
+
+2. **Undo a reset with the reflog.** Note the current tip
+   hash. Run `git reset --hard HEAD~2`, confirm with
+   `git log --oneline` that two commits are gone, then use
+   the reflog to restore the branch to its previous tip.
+   Show the reflog line you used.
+
+3. **Recover without moving the branch.** Repeat the reset
+   from Problem 2, but this time recover by creating a branch
+   at the lost tip rather than by moving `main`. Confirm the
+   lost commits are reachable from the new branch while `main`
+   stays reset.
+
+4. **Bisect by hand.** With the branch whole again, use
+   `git bisect` to find the commit where
+   `Rscript compute.R` first printed `25.75`. Mark the
+   initial commit good and the tip bad, test each midpoint,
+   and report the first bad commit. Finish with
+   `git bisect reset`.
+
+5. **Bisect automatically.** Write a check script that sources
+   or runs `compute.R` and exits `0` when the printed value is
+   `25.66667` and non-zero otherwise. Use `git bisect run` to
+   locate the same commit as in Problem 4 without testing any
+   midpoint by hand.
+
+6. **Blame and the pickaxe.** Use `git blame` to find the
+   commit that last set the `threshold` line, then use
+   `git log -S '18'` (or a more specific string) to find the
+   commit that introduced the value 18. Do the two commands
+   report the same commit? Explain briefly why they must.
+
+7. **Follow a line through time.** Use
+   `git log -L 1,1:compute.R` to show every change to the
+   first line of `compute.R`. How many commits appear, and
+   what does each diff show? Contrast this with what
+   `git blame -L 1,1 compute.R` alone would have told you.
+
+8. **The limit of recovery.** Make an uncommitted edit to
+   `compute.R`, then run `git reset --hard HEAD`. Attempt to
+   recover the edit through the reflog. Can you? Explain in
+   one or two sentences why the reflog does or does not help,
+   connecting your answer to Day 1's warning about
+   `git restore`.
+
+## Solutions
+
+**Problem 1.**
+
+```bash
+git reflog
+#> e1a2b3c (HEAD -> main) HEAD@{0}: commit: Extend notes again
+#> ...
+#> 9f0d1e2 HEAD@{5}: commit (initial): Add computation with threshold 21
+```
+
+The tip is named `HEAD@{0}` and its label reads `commit:
+Extend notes again`. The first commit is named by the
+highest-numbered selector, here `HEAD@{5}`, and its label is
+`commit (initial):`, the form Git uses for the first commit
+in a repository. The exact number depends on how many moves
+your reflog holds.
+
+**Problem 2.**
+
+```bash
+git log --oneline -1
+#> e1a2b3c Extend notes again
+git reset --hard HEAD~2
+git log --oneline -1
+#> 7c3d4e5 Lower threshold to 18
+git reflog
+#> 7c3d4e5 (HEAD -> main) HEAD@{0}: reset: moving to HEAD~2
+#> e1a2b3c HEAD@{1}: commit: Extend notes again
+git reset --hard HEAD@{1}
+git log --oneline -1
+#> e1a2b3c Extend notes again
+```
+
+`HEAD@{1}` names the tip as it stood immediately before the
+reset. `git reset --hard HEAD@{1}` moves `main` back to it,
+undoing the reset. The commits were never destroyed; only the
+branch pointer had moved.
+
+**Problem 3.**
+
+```bash
+git reset --hard HEAD~2
+git branch rescue HEAD@{1}
+git log --oneline main -1
+#> 7c3d4e5 Lower threshold to 18
+git log --oneline rescue -1
+#> e1a2b3c Extend notes again
+```
+
+`git branch rescue HEAD@{1}` creates a pointer at the lost tip
+without touching `main`. The two 'lost' commits are now
+reachable from `rescue`, while `main` remains where the reset
+left it. This is the cautious recovery: nothing on `main`
+changes until you have inspected `rescue` and decided. Restore
+`main` afterwards with `git reset --hard rescue` if desired.
+
+**Problem 4.**
+
+```bash
+git bisect start
+git bisect bad
+git bisect good 9f0d1e2      # the initial commit
+#> Bisecting: ... [<midpoint>]
+Rscript compute.R            # inspect the printed value
+git bisect good              # if it printed 25.66667
+# ... or ...
+git bisect bad               # if it printed 25.75
+#> 7c3d4e5 is the first bad commit
+git bisect reset
+```
+
+The search converges on `Lower threshold to 18`, the commit
+that changed the printed value from `25.66667` to `25.75`.
+Marking each midpoint by the value it prints drives the binary
+search to that commit in two or three tests.
+
+**Problem 5.**
+
+```r
+# check.R
+val <- as.numeric(system("Rscript compute.R", intern = TRUE))
+q(status = if (abs(val - 25.66667) < 0.001) 0 else 1)
+```
+
+```bash
+git bisect start
+git bisect bad
+git bisect good 9f0d1e2
+git bisect run Rscript check.R
+#> 7c3d4e5 is the first bad commit
+git bisect reset
+```
+
+The script exits `0` while the value is still `25.66667`
+(good) and non-zero once it becomes `25.75` (bad).
+`git bisect run` reads those exit statuses as the verdicts and
+reaches the same commit as Problem 4 with no manual testing.
+
+**Problem 6.**
+
+```bash
+git blame -L 1,1 compute.R
+#> 7c3d4e5a (You 2026-07-25 ... 1) threshold <- 18
+git log -S '18' --oneline -- compute.R
+#> 7c3d4e5 Lower threshold to 18
+```
+
+Both report `7c3d4e5`. They must, because in this history the
+value 18 was introduced by exactly one commit, and that same
+commit is therefore the last to have touched the line. Blame
+finds the most recent change to the line; the pickaxe finds
+the commit that changed the count of the string `18`; here
+they coincide. Had 18 been introduced, removed, and
+reintroduced, `git log -S` would list several commits while
+blame still showed only the most recent.
+
+**Problem 7.**
+
+```bash
+git log -L 1,1:compute.R
+#> commit 7c3d4e5...  Lower threshold to 18
+#> -threshold <- 21
+#> +threshold <- 18
+#> commit 9f0d1e2...  Add computation with threshold 21
+#> +threshold <- 21
+```
+
+Two commits appear. The first diff shows the line changing
+from 21 to 18; the second shows the line first being created
+with value 21. `git log -L` reconstructs the entire history of
+the line. `git blame -L 1,1` alone would have shown only
+`7c3d4e5`, the most recent change, hiding the fact that the
+line existed earlier with a different value. The line-log is
+the tool when you need the full provenance rather than the
+last edit.
+
+**Problem 8.** You cannot recover it. `git reset --hard HEAD`
+overwrites the working directory with the committed version,
+and the uncommitted edit was never written to the object
+database, so no reflog entry names it; the reflog records
+commits and reference positions, not working-directory state.
+This is the identical loss Day 1 flagged for `git restore`:
+the safety net protects committed history, and the one thing
+it cannot catch is work that was never committed. Commit
+before any `--hard` operation and this class of loss cannot
+occur.
+
+## What's next
+
+You have completed the bridge. Over three days you added
+selective staging and the stash to your daily workflow, made
+the rewriting of history a controlled and reversible tool
+rather than a hazard, and, today, learned the reflog that
+made that rewriting safe all along, together with the forensic
+commands that reconstruct how any value in an analysis came to
+be. With the boot camp behind you and this bridge complete,
+your preparation in version control proper is finished. You
+can compose clean history, revise it deliberately, recover
+from the accidents that revision invites, and investigate the
+provenance of a result down to the line and the commit.
+
+### Where this bridge hands off
+
+The remaining subjects are no longer about Git the tool but
+about the infrastructure built around it, and they belong to
+the *Biostatistics Practicum*. The Practicum takes up, in
+order:
+
+- Git internals: the object model of blobs, trees, and
+  commits underlying everything in this book, and the plumbing
+  commands that manipulate them.
+- Hooks and continuous integration: pre-commit checks and
+  GitHub Actions that run tests and validation automatically
+  on every push.
+- Containerised, dependency-pinned reproducibility: Docker and
+  `renv` in depth, so that an analysis runs identically on any
+  machine and in any year.
+- Data and large-artifact versioning: Git LFS and DVC for the
+  datasets and model outputs that do not belong in ordinary
+  Git.
+- Team-scale collaboration policy: branch protection,
+  `CODEOWNERS`, review requirements, and the regulatory
+  version-control practice of clinical-trial deliverables.
+
+Each extends a skill this bridge established into the full
+reproducible pipeline that professional statistical work
+requires. Keep the `trial-analysis` repository; the Practicum
+begins where Day 3 leaves it. Congratulations on completing
+the bridge, and carry the reflog with you: whatever you
+attempt next, committed work is recoverable, and that
+assurance is what lets you work boldly.

@@ -1,0 +1,848 @@
+# Day 2: Rewriting History {#sec-day2}
+
+## Learning objectives
+
+By the end of this day you should be able to:
+
+- Explain that rewriting a commit produces a new commit
+  with a new hash, and that the old commit is replaced
+  rather than edited in place.
+- Repair the most recent commit with `git commit --amend`:
+  correct its message, add a forgotten file, or fold in a
+  further edit, including the `--amend --no-edit` form.
+- Refer to commits for rewriting by `HEAD~n`, by short
+  hash, and by range.
+- Run an interactive rebase with `git rebase -i HEAD~n`,
+  and use `pick`, `reword`, `edit`, `squash`, `fixup`,
+  `drop`, and line reordering to reshape a messy branch.
+- Squash a cluster of work-in-progress commits into one
+  clean, reworded commit, and abort cleanly when a rebase
+  goes wrong.
+- Prepare a fixup with `git commit --fixup <hash>` and
+  apply it with `git rebase -i --autosquash`.
+- Copy a single commit onto the current branch with
+  `git cherry-pick <hash>`.
+- State the governing rule of history rewriting and apply
+  it: rewrite only local, unpublished commits, and update
+  a pushed personal branch with
+  `git push --force-with-lease`, never a bare `--force` on
+  a shared branch.
+
+## Lecture
+
+### Rewriting means replacing
+
+Yesterday you learned to assemble clean commits as you go.
+Today concerns the commits you did not assemble cleanly:
+the branch that already carries three commits named 'wip',
+'fix', and 'oops', or the commit whose message has a typo,
+or the file you forgot to stage before committing. Git lets
+you reshape recorded history so that what a reviewer reads
+is a deliberate sequence rather than a transcript of your
+false starts.
+
+One fact governs everything that follows. A commit is
+immutable: its hash is a checksum of its content, its
+message, its author, and its parent. You cannot edit a
+commit. What the commands below actually do is build a
+**new** commit from the old one plus your change, give it a
+new hash, and move the branch pointer to it. The original
+commit is not modified; it is abandoned, left with no branch
+pointing at it, to be recovered through the reflog (Day 3)
+or eventually garbage-collected. Keep this in mind: every
+'edit' of history in this chapter is a replacement.
+
+### Amending the last commit
+
+The simplest rewrite targets only the most recent commit.
+`git commit --amend` replaces `HEAD` with a new commit built
+from whatever is currently staged, plus the old commit's
+content, opening an editor on the old message so you can
+revise it.
+
+The commonest use is a message you want to fix. Suppose you
+have just committed and see a typo:
+
+```bash
+$ git log --oneline -1
+a1b2c3d Ad change-in-HbA1c tabel by sex
+$ git commit --amend
+```
+
+Your editor opens on the old message; correct it, save, and
+close:
+
+```bash
+[main e4f5a6b] Add change-in-HbA1c table by sex
+ 1 file changed, 3 insertions(+)
+```
+
+Note the hash changed, from `a1b2c3d` to `e4f5a6b`. This is
+the replacement at work: the reworded commit is a different
+object.
+
+The second use is the forgotten file. You committed
+`analysis.R` but forgot that the change also needed a new
+helper, `R/subgroup.R`. Rather than a second commit reading
+'add file I forgot', fold it into the commit it belongs to:
+
+```bash
+git add R/subgroup.R
+git commit --amend --no-edit
+```
+
+The `--no-edit` flag keeps the existing message unchanged,
+which is what you want when the content changes but the
+message still describes it correctly. The same pattern folds
+in a further edit: stage the additional change with
+`git add -p` from Day 1, then `git commit --amend --no-edit`
+to absorb it into the last commit.
+
+::: {.callout-note icon=false collapse=true}
+## Check your understanding: what does amend replace?
+
+You commit, then run `git add forgotten.R` and
+`git commit --amend --no-edit`. Afterwards, how many commits
+does `git log --oneline` show compared with before, and has
+the hash of the top commit changed?
+
+The count is unchanged: amend does not add a commit, it
+replaces the existing top commit. The hash of that top
+commit **has** changed, because the new commit contains an
+extra file and therefore a different content checksum. The
+old commit still exists in the object database, reachable
+through the reflog, but no branch points to it. This is why
+amend, like rebase, is safe only on unpublished commits: any
+collaborator who had fetched the old hash now holds a commit
+your branch no longer contains.
+:::
+
+::: {.callout-warning}
+## Warning
+
+`git commit --amend` rewrites the last commit and so is
+subject to the governing rule below. If the commit you are
+amending has already been pushed to a shared branch, amending
+it and pushing again forces a divergence that every
+collaborator must reconcile. Amend freely while the commit is
+still local; think twice once it has left your machine.
+:::
+
+### Referring to commits
+
+Rewriting commands need a way to name the commits they act
+on. Three notations from the boot camp suffice, recapped
+briefly.
+
+- **`HEAD`** is the current commit; **`HEAD~1`** (or
+  `HEAD~`) is its parent, **`HEAD~2`** its grandparent, and
+  in general `HEAD~n` is the commit `n` steps back along the
+  first-parent line.
+- A **short hash**, the seven-or-so characters `git log
+  --oneline` prints, names a commit directly and
+  unambiguously in all but the largest repositories.
+- A **range** `A..B` denotes the commits reachable from `B`
+  but not from `A`, that is, the commits after `A` up to and
+  including `B`. Interactive rebase uses this implicitly:
+  `git rebase -i HEAD~3` replays the three commits after
+  `HEAD~3`, namely `HEAD~2`, `HEAD~1`, and `HEAD`.
+
+When you plan a rebase, count the commits you intend to
+reshape and name the commit just before them. To tidy the
+last three commits, that base is `HEAD~3`.
+
+### Interactive rebase {#sec-interactive-rebase}
+
+Interactive rebase is the central tool of this chapter. It
+takes a run of consecutive commits, presents them as an
+editable 'to-do' list, and replays them according to the
+instructions you leave. With it you can reword messages,
+reorder commits, combine several into one, split work across
+a stop, and delete commits entirely.
+
+Start it by naming the base commit, the one just before the
+first commit you want to touch:
+
+```bash
+$ git rebase -i HEAD~3
+```
+
+Git opens your editor on a to-do list. The commits are
+listed **oldest first**, the reverse of `git log`, because
+they will be replayed in that order:
+
+```text
+pick 7a1c9e0 wip
+pick 3f2b8d1 fix
+pick c5e4a90 oops
+
+# Rebase 9a1c3e5..c5e4a90 onto 9a1c3e5 (3 commands)
+#
+# Commands:
+# p, pick <commit>   = use commit
+# r, reword <commit> = use commit, but edit the commit message
+# e, edit <commit>   = use commit, but stop for amending
+# s, squash <commit> = use commit, but meld into previous commit
+# f, fixup <commit>  = like "squash", but discard this commit's log message
+# d, drop <commit>   = remove commit
+# ...
+```
+
+You reshape history by editing this list. Each line begins
+with an **action**:
+
+- **`pick`** replay the commit unchanged. This is the
+  default for every line.
+- **`reword`** replay the commit but stop to edit its
+  message.
+- **`edit`** stop after replaying the commit, with it as
+  `HEAD`, so you can amend its content or split it, then
+  resume.
+- **`squash`** meld this commit into the one **above** it,
+  combining their messages into one you get to edit.
+- **`fixup`** like `squash`, but discard this commit's
+  message and keep only the one above.
+- **`drop`** discard the commit entirely (equivalently,
+  delete its line).
+
+You can also **reorder** commits by moving whole lines up or
+down, and Git will replay them in the new order. Reordering
+is safe when the commits touch different files; when they
+touch the same lines it can produce a conflict you resolve as
+in a merge.
+
+Consider the three messy commits above, the residue of a
+Day 1 session where you committed 'wip' early, then 'fix' and
+'oops' as you corrected it. They are one logical change
+recorded in three untidy steps. You want a single, well-named
+commit. Edit the to-do list so the first commit is reworded
+and the other two are folded into it with `fixup` (their
+messages, 'fix' and 'oops', are worthless and can be
+discarded):
+
+```text
+reword 7a1c9e0 wip
+fixup 3f2b8d1 fix
+fixup c5e4a90 oops
+```
+
+Save and close. Because the first line says `reword`, Git
+now opens a second editor for its message. Replace 'wip'
+with something a reviewer can read:
+
+```text
+Add age-subgroup HbA1c table with tests
+```
+
+Save and close again. Git replays the three commits as one
+and reports:
+
+```bash
+[detached HEAD b8d2f31] Add age-subgroup HbA1c table with tests
+ Date: Wed Jul 22 09:14:02 2026 -0700
+ 2 files changed, 41 insertions(+)
+Successfully rebased and updated refs/heads/main.
+```
+
+The log now shows one clean commit where three messy ones
+stood:
+
+```bash
+$ git log --oneline -2
+b8d2f31 Add age-subgroup HbA1c table with tests
+9a1c3e5 Correct age-eligibility threshold to >= 18
+```
+
+#### Stopping to amend: the edit action
+
+`squash` and `fixup` combine commits; `edit` does the
+opposite work of letting you change one commit in the middle
+of a run. When the rebase reaches a line marked `edit`, it
+replays that commit and then stops, leaving it as `HEAD` with
+a clean working tree, and prints instructions:
+
+```bash
+Stopped at 3f2b8d1...  fix
+You can amend the commit now, with
+  git commit --amend
+Once you are satisfied with your changes, run
+  git rebase --continue
+```
+
+At this stop you do ordinary work: edit files, stage with
+`git add`, and fold the change in with `git commit --amend`,
+exactly as earlier in this chapter. You might also split the
+commit here, resetting it and making two smaller commits in
+its place. When the commit is as you want it, resume the
+replay:
+
+```bash
+git rebase --continue
+```
+
+Git applies the remaining to-do lines and finishes.
+
+#### Aborting a rebase
+
+If a rebase goes wrong, whether you mistyped an action, hit a
+conflict you are not ready to resolve, or simply changed your
+mind, you are never trapped. At any pause, restore the branch
+to exactly its pre-rebase state:
+
+```bash
+git rebase --abort
+```
+
+This returns `HEAD` and the working tree to where they were
+before you started, as if the rebase had never run. Reach for
+it whenever a rebase confuses you; then start again more
+carefully.
+
+::: {.callout-warning}
+## Warning
+
+An interactive rebase rewrites every commit it replays,
+giving each a new hash, including commits you left as `pick`
+if they follow a rewritten one, because their parent changed.
+Never run `git rebase -i` across commits you have already
+pushed to a branch others share. On your own unpushed work,
+or a personal feature branch nobody has based work on, rebase
+freely; the reflog (Day 3) makes even a botched rebase
+recoverable.
+:::
+
+::: {.callout-tip}
+## Tip
+
+If your editor opens on the to-do list and you cannot recall
+what an action does, the comment block Git prints beneath the
+list is a full reference, and closing the editor with the
+list unchanged (all `pick`) simply replays history as it was,
+a harmless no-op. Save an empty or all-comment list, or run
+`git rebase --abort` at the next prompt, to back out without
+effect.
+:::
+
+### The autosquash workflow
+
+Choosing to squash while editing a to-do list works, but Git
+offers a way to mark the intent at commit time, which is
+tidier when you notice a fix belongs to an earlier commit. If
+you have just written a correction that properly belongs in
+commit `9a1c3e5`, commit it as a fixup of that commit:
+
+```bash
+git add analysis.R
+git commit --fixup 9a1c3e5
+```
+
+This creates an ordinary commit whose message is
+`fixup! Correct age-eligibility threshold to >= 18`, echoing
+the target's subject. It records, in the message, that this
+commit is destined to be folded into `9a1c3e5`. Later, run an
+interactive rebase with `--autosquash`:
+
+```bash
+git rebase -i --autosquash HEAD~4
+```
+
+Git prepares the to-do list with the fixup commit already
+moved directly beneath its target and pre-marked `fixup`, so
+you review and save rather than reorder by hand. The result
+is identical to a manual squash, but the bookkeeping was done
+when the correction was fresh in your mind.
+
+### Cherry-picking a single commit
+
+Rebase reshapes a run of commits in place. Sometimes you
+instead want one specific commit from **elsewhere**, applied
+onto your current branch. `git cherry-pick <hash>` does
+exactly that: it takes the change introduced by one commit
+and replays it as a new commit on `HEAD`.
+
+Suppose a colleague fixed a units bug in a shared helper on
+another branch, in commit `d17a4c2`, and you need that fix on
+your feature branch now, without merging the whole branch:
+
+```bash
+$ git cherry-pick d17a4c2
+[subgroup-analysis 2e9f0a7] Fix mmol/mol to percent conversion
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+```
+
+The result is a new commit on your branch with the same
+change and message as the original, but a new hash, because
+its parent differs. Cherry-pick is the tool for lifting one
+useful commit out of context: a hotfix you need on two
+branches, or a single good commit from an abandoned line of
+work.
+
+A cherry-pick can conflict, exactly as a merge can, when the
+change does not apply cleanly to your branch. Git pauses and
+marks the conflicting files with the same `<<<<<<<`,
+`=======`, `>>>>>>>` markers you resolved in the boot camp.
+Edit the files to resolve, stage them, then continue:
+
+```bash
+git add <resolved-file>
+git cherry-pick --continue
+```
+
+As with rebase, `git cherry-pick --abort` backs the operation
+out entirely if you would rather not proceed.
+
+### The governing rule: do not rewrite published history
+
+Every operation in this chapter replaces commits with new
+ones. That is safe when the commits are yours alone, and
+dangerous the moment they are shared. The rule is short and
+absolute:
+
+> Never rewrite history that has been published, that is,
+> pushed to a branch that others may have pulled. Rewrite
+> only local, unpushed commits, or commits on a personal
+> branch that nobody else has based work on.
+
+The reason is mechanical. Rewriting a pushed commit replaces
+it with one of a different hash, so your branch and the
+remote disagree about what commits exist. A collaborator who
+pulled the original still holds it, along with any work built
+on top of it; when your rewritten branch reaches them, Git
+cannot fast-forward, and their downstream commits, now
+parented on a commit that no longer exists on the remote, can
+be duplicated or lost. A single rewrite of a shared branch
+can cost a team an afternoon.
+
+The safe domain of rewriting is therefore precise:
+
+- **Local commits you have not pushed.** Reshape them
+  freely; nobody else has seen them.
+- **A personal feature branch** that you pushed only to back
+  up work or open a draft pull request, and that no
+  collaborator has branched from or built upon. This is the
+  one case where you may rewrite already-pushed commits, and
+  it requires the careful force-push below.
+- **Never** `main`, a shared `develop`, a release branch, or
+  any branch on which others are actively working.
+
+When in doubt, do not rewrite; a slightly untidy shared
+history is vastly preferable to a rewrite that strands a
+colleague's work.
+
+::: {.callout-note icon=false collapse=true}
+## Check your understanding: which rewrites are safe?
+
+For each, decide whether rewriting is safe: (a) three local
+commits you have not pushed; (b) the last commit on `main`,
+which you pushed an hour ago and a co-author has since pulled;
+(c) your branch `subgroup-analysis`, pushed only to open a
+draft pull request nobody has reviewed or branched from.
+
+(a) **Safe.** Unpushed local commits are yours alone; rebase
+or amend at will. (b) **Unsafe.** The commit is on a shared
+branch and a collaborator already holds it; rewriting it would
+force a reconciliation on them and risk their downstream work.
+Correct it with a new commit instead. (c) **Safe, with care.**
+A personal branch nobody has built upon may be rewritten, but
+because it is already on the remote you must update it with
+`git push --force-with-lease`, described next, rather than an
+ordinary push.
+:::
+
+### Updating a pushed branch with force-with-lease
+
+Once you rewrite commits you have already pushed, an ordinary
+`git push` is rejected: the remote and your rewritten branch
+have diverged, and Git will not fast-forward. You must tell
+Git to replace the remote branch with yours. The naive tool
+is `git push --force`, and it is dangerous: it overwrites the
+remote branch unconditionally, discarding any commit a
+collaborator pushed in the interval that you have not seen.
+
+Prefer `git push --force-with-lease`. It force-pushes only if
+the remote branch is still where you last observed it; if
+someone else has pushed to it since your last fetch, the push
+is refused and you are warned, so you can fetch, inspect their
+work, and avoid destroying it:
+
+```bash
+$ git push --force-with-lease origin subgroup-analysis
+ + b8d2f31...c5e4a90 subgroup-analysis -> subgroup-analysis (forced update)
+```
+
+The distinction is the whole point. `--force` says 'make the
+remote match me, whatever is there'. `--force-with-lease`
+says 'make the remote match me, but only if it is still what
+I last saw'. The second refuses in exactly the case, an
+unexpected push by someone else, where the first would
+silently destroy work.
+
+::: {.callout-warning}
+## Warning
+
+Never `git push --force` (or `--force-with-lease`) to a
+shared branch such as `main`. Force-pushing is reserved for
+your own feature branch, and even there
+`--force-with-lease` is the only acceptable form. Configure a
+memorable habit: if the branch name is not one you created
+and control alone, no force-push of any kind is permitted.
+Branch protection, which the *Practicum* covers, exists
+precisely to make this mistake impossible on important
+branches.
+:::
+
+## Worked example: cleaning a feature branch before review
+
+The `trial-analysis` repository continues from Day 1. You
+have been working on a feature branch, `subgroup-analysis`,
+and pushed it early to open a **draft** pull request so a
+co-investigator could follow along. Nobody has reviewed it or
+branched from it. The branch carries four commits, three of
+them the work-in-progress residue Day 1 warned about, plus
+one genuine, well-named commit made afterward:
+
+```bash
+$ git log --oneline -4
+9c3a1f7 Add unit tests for subgroup function
+b2e8d40 oops
+a7f1c93 wip
+5d0b6a2 wip sex subgroup
+```
+
+Read bottom to top, this is one coherent piece of work, the
+sex-subgroup analysis and its tests, recorded as four
+commits, three of them noise. You want the reviewer to see
+two clean commits: one adding the analysis function, one
+adding its tests. The before-and-after shape:
+
+```text
+before:  ... -- 5d0b6a2 -- a7f1c93 -- b2e8d40 -- 9c3a1f7
+              (wip)      (wip)      (oops)     (tests)
+
+after:   ... -- F1 -------- F2
+              (function)  (tests)
+```
+
+The three work-in-progress commits, `5d0b6a2`, `a7f1c93`, and
+`b2e8d40`, all build the subgroup function and belong
+together as commit F1; the test commit `9c3a1f7` becomes F2.
+Start an interactive rebase over the four commits:
+
+```bash
+$ git rebase -i HEAD~4
+```
+
+Git opens the to-do list, oldest first:
+
+```text
+pick 5d0b6a2 wip sex subgroup
+pick a7f1c93 wip
+pick b2e8d40 oops
+pick 9c3a1f7 Add unit tests for subgroup function
+```
+
+Reword the first commit to name the function it introduces,
+fold the two later work-in-progress commits into it with
+`fixup`, and leave the test commit as its own `pick`:
+
+```text
+reword 5d0b6a2 wip sex subgroup
+fixup a7f1c93 wip
+fixup b2e8d40 oops
+pick 9c3a1f7 Add unit tests for subgroup function
+```
+
+Save and close. Because the first line is `reword`, Git opens
+an editor for its message; replace 'wip sex subgroup' with a
+description a reviewer can read:
+
+```text
+Add change-in-HbA1c analysis by sex subgroup
+```
+
+Save and close. Git replays the branch and reports:
+
+```bash
+[detached HEAD 4a9e2c1] Add change-in-HbA1c analysis by sex subgroup
+ 2 files changed, 28 insertions(+)
+Successfully rebased and updated refs/heads/subgroup-analysis.
+```
+
+Verify the result with a graph log. Four commits have become
+two, each single-purpose and clearly named:
+
+```bash
+$ git log --oneline --graph -3
+* f70b3d8 Add unit tests for subgroup function
+* 4a9e2c1 Add change-in-HbA1c analysis by sex subgroup
+* 9a1c3e5 Correct age-eligibility threshold to >= 18
+```
+
+Note that the test commit's hash changed, from `9c3a1f7` to
+`f70b3d8`, although you left it as `pick`: its parent was
+rewritten, so it too is a new commit. This is the replacement
+principle in action.
+
+The branch is now clean, but the remote still holds the old
+four-commit version from the draft pull request. Because this
+is your personal branch and nobody has built upon it, you may
+update it, using `--force-with-lease` so that the push is
+refused if the co-investigator happened to push something you
+have not seen:
+
+```bash
+$ git push --force-with-lease origin subgroup-analysis
+ + 9c3a1f7...f70b3d8 subgroup-analysis -> subgroup-analysis (forced update)
+```
+
+The pull request now shows two intelligible commits. The
+reviewer reads a deliberate sequence, the analysis then its
+tests, with no trace of the work-in-progress path that
+produced it. This is the everyday purpose of rewriting:
+the history you were free to make messily becomes the history
+you publish cleanly.
+
+## Homework
+
+Work in a scratch repository so that no rewrite can harm work
+you care about. Create one and seed it with a short R script:
+
+```bash
+mkdir rebase-practice
+cd rebase-practice
+git init
+printf 'a <- 1\n' > script.R
+git add script.R
+git commit -m 'Initial script'
+```
+
+1. **Amend a message.** Add a line to `script.R`, commit it
+   with a deliberately misspelled message, then fix the
+   message with `git commit --amend`. Use `git log --oneline`
+   before and after to confirm the commit's hash changed
+   while the commit count did not.
+
+2. **Amend in a forgotten file.** Create `helper.R` but
+   forget to stage it; commit a change to `script.R` alone.
+   Then stage `helper.R` and fold it into that same commit
+   with `git commit --amend --no-edit`. Confirm with
+   `git show --stat` that the one commit now contains both
+   files.
+
+3. **Reword with rebase.** Make three commits with the
+   messages 'first', 'second', and 'third'. Run
+   `git rebase -i HEAD~3` and reword only the middle commit.
+   Show the resulting `git log --oneline`.
+
+4. **Squash three into one.** Make three commits named 'wip',
+   'more', and 'done', each adding one line to `script.R`.
+   Use an interactive rebase to combine them into a single
+   commit with a clear message, discarding the 'more' and
+   'done' messages. Confirm the log shows one commit where
+   three stood.
+
+5. **Drop a commit.** Make three commits; the middle one adds
+   a line `debug <- TRUE` you never wanted. Use
+   `git rebase -i HEAD~3` to drop that commit, and confirm
+   with `git show HEAD~1` and the file contents that the
+   debug line is gone while the other two commits remain.
+
+6. **Autosquash.** Commit a change, then commit a correction
+   to it with `git commit --fixup <hash>` naming the first
+   commit. Run `git rebase -i --autosquash HEAD~2` and observe
+   that Git has pre-arranged the to-do list. Save it and
+   confirm the two commits became one.
+
+7. **Cherry-pick across branches.** From `main`, create a
+   branch `feature` and add a commit. Return to `main` and
+   note a commit hash on `feature` with `git log feature`.
+   Cherry-pick that one commit onto `main` and confirm with
+   `git log --oneline` that `main` now carries the change
+   under a new hash.
+
+8. **Reason about safety.** For each, state whether you may
+   rewrite, and if you push afterward, which push form you
+   would use: (a) two local commits you have not pushed; (b)
+   a commit on `main` you pushed yesterday and a co-author has
+   pulled; (c) your own branch `draft-pr`, pushed for a draft
+   pull request nobody has reviewed or branched from.
+
+## Solutions
+
+**Problem 1.**
+
+```bash
+# edit script.R, then:
+git commit -am 'Ad a second lien'
+git log --oneline -1
+#> 1a2b3c4 Ad a second lien
+git commit --amend
+# fix the message in the editor to 'Add a second line'
+git log --oneline -1
+#> 9f8e7d6 Add a second line
+```
+
+The commit count is unchanged; amend replaces the top commit
+rather than adding one. The hash changed because the message
+is part of the commit's checksum, so a reworded commit is a
+new object.
+
+**Problem 2.**
+
+```bash
+printf 'h <- 2\n' > helper.R
+# forget to stage helper.R
+git commit -am 'Add helper logic'
+git add helper.R
+git commit --amend --no-edit
+git show --stat
+#> Add helper logic
+#>  helper.R | 1 +
+#>  script.R | 1 +
+#>  2 files changed, 2 insertions(+)
+```
+
+The `--no-edit` flag keeps the original message, which still
+describes the commit correctly. The single commit now records
+both files, as if `helper.R` had been staged all along.
+
+**Problem 3.**
+
+```bash
+git rebase -i HEAD~3
+# in the to-do list, change 'pick' to 'reword' on the
+# middle line only:
+#   pick   ... first
+#   reword ... second
+#   pick   ... third
+# Git then opens an editor on the middle commit's message.
+git log --oneline -3
+#> ... third
+#> ... second (reworded)
+#> ... first
+```
+
+Only the middle commit's message changed, but note that its
+hash and the hash of every commit after it changed too,
+because a rewritten commit alters the parent of all its
+descendants.
+
+**Problem 4.**
+
+```bash
+git rebase -i HEAD~3
+# edit the to-do list to:
+#   pick  ... wip
+#   fixup ... more
+#   fixup ... done
+# no message editor opens, because 'fixup' discards the
+# folded messages; to reword the survivor use 'reword' on
+# the first line, or 'squash' on the others.
+git log --oneline
+#> ... wip
+#> ... Initial script
+```
+
+Using `fixup` on the second and third lines discards their
+messages and melds their changes into the first commit. To
+give the survivor a clean message in the same operation,
+change its `pick` to `reword`.
+
+**Problem 5.**
+
+```bash
+git rebase -i HEAD~3
+# delete the middle line entirely, or change its action to
+# 'drop':
+#   pick ... first
+#   drop ... add debug flag
+#   pick ... third
+git show HEAD~1
+# the debug commit is gone; 'first' is now HEAD~1
+grep debug script.R
+#> (no output)
+```
+
+Dropping a commit removes its change from history entirely.
+The remaining two commits are replayed with new hashes onto
+the unchanged base, and the `debug <- TRUE` line never
+existed in the rebuilt history.
+
+**Problem 6.**
+
+```bash
+git commit -am 'Add analysis step'      # say this is 3c4d5e6
+# make a correction, then:
+git add script.R
+git commit --fixup 3c4d5e6
+git log --oneline -2
+#> ... fixup! Add analysis step
+#> 3c4d5e6 Add analysis step
+git rebase -i --autosquash HEAD~2
+# the to-do list arrives pre-arranged:
+#   pick  3c4d5e6 Add analysis step
+#   fixup ....... fixup! Add analysis step
+# save without editing.
+git log --oneline -1
+#> 7e8f9a0 Add analysis step
+```
+
+`--autosquash` reads the `fixup!` prefix, moves the fixup
+commit beneath its target, and pre-marks it `fixup`, so the
+squash needs no manual reordering. The two commits become
+one, under the target's message.
+
+**Problem 7.**
+
+```bash
+git branch feature
+git switch feature
+printf 'f <- 9\n' >> script.R
+git commit -am 'Add feature line'
+git switch main
+git log feature --oneline -1
+#> abc1234 Add feature line
+git cherry-pick abc1234
+git log --oneline -1
+#> def5678 Add feature line
+```
+
+The change from `feature` now sits on `main` as a new commit
+with a different hash (`def5678`, not `abc1234`), because its
+parent on `main` differs from its parent on `feature`.
+Cherry-pick copies a change, it does not move the original
+commit.
+
+**Problem 8.**
+
+(a) **May rewrite; ordinary push (or none).** Unpushed local
+commits are yours alone. If you push for the first time after
+rewriting, an ordinary `git push` suffices, because there is
+nothing on the remote to diverge from.
+
+(b) **Must not rewrite.** The commit is on a shared branch and
+a co-author has pulled it; rewriting would force a painful
+reconciliation and risk their work. Correct it with a new
+commit and an ordinary push.
+
+(c) **May rewrite; push with `--force-with-lease`.** A
+personal branch nobody has built upon is safe to rewrite, but
+because it is already published you must update the remote
+with `git push --force-with-lease`, never a bare `--force`.
+
+## What's next
+
+Today you learned to reshape recorded history: amending the
+last commit, squashing and rewording a branch of
+work-in-progress commits into a clean sequence with
+interactive rebase, lifting a single commit with cherry-pick,
+and updating a personal branch safely with
+`--force-with-lease`, all bounded by the rule that published
+history is not rewritten. Every one of these operations
+replaces commits, and a replaced commit is not destroyed but
+merely unreferenced. Day 3 makes that safety net explicit: it
+covers `git reflog`, which records everywhere `HEAD` has
+been and lets you recover a commit abandoned by a rebase or an
+amend, and then `git bisect` and `git blame` for finding when
+and where a result changed. Keep the `trial-analysis`
+repository; Day 3 continues from here.

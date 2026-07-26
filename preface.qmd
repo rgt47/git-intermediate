@@ -1,0 +1,118 @@
+# Preface {.unnumbered}
+
+This volume is a three-day bridge between *Git and GitHub
+for Biostatistics: A One-Week Boot Camp* and the graduate
+sequence that follows it. The boot camp is a prerequisite;
+this bridge assumes the reader is fluent in the everyday
+workflow it taught.
+
+## Why a bridge, and why only three days
+
+The boot camp is deliberately narrow. It teaches the
+irreducible daily workflow: `init`, `add`, `commit`,
+`status`, `log`, `diff`, the undo commands, branching and
+merging, remotes, and the pull-request cycle on GitHub. A
+student who completes it can work reproducibly and
+collaborate. Within days of finishing, however, that
+student meets a predictable set of problems the boot camp
+did not cover:
+
+- The working directory contains two unrelated changes, and
+  the student wants each in its own commit rather than one
+  muddled commit.
+- A colleague asks for a change, but the student is halfway
+  through something else and cannot cleanly commit yet.
+- A feature branch has accumulated six commits with messages
+  like 'wip', 'fix', and 'oops', and a reviewer is about to
+  read it.
+- A `git reset --hard` discarded the wrong work, and the
+  student needs it back.
+- A number in a table changed between two analyses and
+  nobody can say which commit changed it.
+
+Each of these has a standard, learnable solution, and none
+belongs in a first week. They also do not belong in the
+*Practicum*, whose subject is the infrastructure around
+version control (Docker, `renv`, continuous integration,
+CDISC deliverables) rather than the version-control craft
+itself. The three-day bridge fills exactly this gap, and no
+more.
+
+## What this bridge covers
+
+Three days, one chapter each:
+
+1. **Selective staging and work in progress.** Patch-mode
+   staging with `git add -p` and `git restore -p`;
+   composing a clean commit from a mixed working directory;
+   splitting an over-large change; shelving and restoring
+   unfinished work with `git stash`.
+2. **Rewriting history.** `git commit --amend` in depth;
+   interactive rebase (`git rebase -i`) to reword, reorder,
+   squash, fixup, and drop commits; `git cherry-pick`;
+   `git push --force-with-lease`; and the governing rule,
+   namely that published history is rewritten only under
+   strict conditions.
+3. **Recovery and forensics.** `git reflog` as the safety
+   net beneath every history-altering operation;
+   `git bisect` to locate the commit that introduced a
+   change in a result; `git blame`, the pickaxe
+   (`git log -S` and `-G`), and `git log -L` to investigate
+   how a line or a value came to be.
+
+Each chapter is approximately 1 hour of reading and worked
+examples plus 2 hours of homework problems with worked
+solutions provided.
+
+## What this bridge does not cover
+
+The bridge stops short of the infrastructure that the
+*Practicum* owns:
+
+- Continuous integration and GitHub Actions.
+- Pre-commit hooks and automated checks.
+- Containerised, dependency-pinned reproducibility (Docker,
+  `renv` in depth).
+- Data and large-artifact versioning (Git LFS, DVC).
+- Regulatory version-control practice for clinical trials
+  (CDISC deliverables, validated pipelines).
+- Team-scale collaboration policy (branch protection,
+  `CODEOWNERS`, review requirements, `rerere`).
+
+Each of these is named where it naturally arises, with a
+pointer to the *Practicum*.
+
+## How this bridge is meant to be used
+
+The three-day cadence matches the boot camp: roughly three
+hours of focused work per day, one hour reading with a
+terminal open and two hours on the homework. Every command
+should be run, not merely read; the history-altering
+operations in particular are learned only by performing
+them on a scratch repository and observing the result.
+
+The commands are shown for a Unix-style shell (macOS
+Terminal, Linux, or Git Bash on Windows), consistent with
+the boot camp.
+
+## Prerequisites
+
+The bridge assumes:
+
+- Completion of *Git and GitHub for Biostatistics*, or
+  equivalent fluency: comfort with `add`, `commit`,
+  `status`, `log`, `diff`, branching, merging, remotes, and
+  pull requests.
+- Git 2.40 or later and, for the GitHub-facing material,
+  the `gh` command-line tool authenticated as in the boot
+  camp.
+
+## Acknowledgements
+
+This bridge consolidates the intermediate patterns that
+recur in reproducible statistical practice. Scott Chacon
+and Ben Straub's *Pro Git* and Jenny Bryan's *Happy Git and
+GitHub for the useR* provide the technical scaffolding; the
+selection reflects experience with the specific problems
+incoming students hit in the weeks after their first
+commit.

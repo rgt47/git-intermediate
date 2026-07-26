@@ -1,0 +1,70 @@
+# Welcome {.unnumbered .unlisted}
+
+This is the online version of **Intermediate Git for
+Biostatistics: A Three-Day Bridge** by The rgtlab
+Curriculum Project. It is a short second course in version
+control, situated between the boot camp and the graduate
+sequence proper.
+
+The companion volume *Git and GitHub for Biostatistics: A
+One-Week Boot Camp* takes a student from never having made
+a commit to collaborating through pull requests. This
+bridge picks up there. It teaches the intermediate skills a
+student reaches for within days of finishing the boot camp:
+committing a clean subset of a messy working directory,
+shelving work in progress, curating a branch's history into
+something a reviewer can read, and recovering when an
+operation goes wrong. These are the skills that separate a
+tidy, reproducible project history from a serviceable but
+untrustworthy one.
+
+The bridge is deliberately short, **three days** rather than
+five, at the same daily cadence: one hour of lecture, two
+hours of homework, no examinations. It is not a survey of
+everything Git can do. The infrastructure that surrounds
+version control in professional practice, namely continuous
+integration, containerisation, dependency pinning, and
+data-versioning tooling, is left to the *Biostatistics
+Practicum*, which this bridge feeds directly.
+
+The organising principle is unchanged from the boot camp:
+version control is a research-integrity tool. Where the boot
+camp taught a student to record history, this bridge teaches
+a student to curate and to recover it, so that the commit
+log remains a faithful and legible account of how an
+analysis was built.
+
+The scope of each day:
+
+1. **Selective staging and work in progress.** Committing
+   part of a file with patch-mode staging, discarding
+   selective changes, and shelving unfinished work with the
+   stash.
+2. **Rewriting history.** Amending, interactive rebase,
+   cherry-picking, and the discipline that governs when
+   rewriting is safe and when it is forbidden.
+3. **Recovery and forensics.** The reflog as a safety net,
+   `git bisect` to locate the commit that changed a result,
+   and `git blame` and the pickaxe to investigate history.
+
+## Position in the sequence
+
+This bridge is a preparatory companion, alongside the two
+boot camps, to the graduate sequence:
+
+- [*Git and GitHub for Biostatistics*](https://git-bootcamp.rgtlab.org)
+  — the prerequisite boot camp.
+- [*R for Biostatistics*](https://r-bootcamp.rgtlab.org)
+  — the parallel R boot camp.
+- [*Biostatistics Practicum*](https://rgtlab.org/practicum)
+  — workflow infrastructure, which this bridge feeds.
+
+## License
+
+This book is licensed under
+[Creative Commons
+Attribution-NonCommercial-NoDerivatives 4.0 International](https://creativecommons.org/licenses/by-nc-nd/4.0/).
+
+Code samples are licensed under
+[Creative Commons CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/),
+i.e. public domain.

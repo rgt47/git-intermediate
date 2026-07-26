@@ -1,0 +1,110 @@
+# Conventions {.unnumbered}
+
+This page summarises the visual conventions used throughout
+the book. They are identical to those of the companion boot
+camp, repeated here for convenience.
+
+## Commands and output
+
+This book is command-line first. Shell commands appear in
+syntax-highlighted blocks. A command the reader types is
+shown after a `$` prompt; the prompt itself is not typed.
+Output appears on the following lines, without a prompt:
+
+```bash
+$ git --version
+git version 2.45.2
+```
+
+When a sequence of commands is shown without output, the
+prompts are omitted for readability:
+
+```bash
+git add -p analysis.R
+git commit -m 'Fix na.rm in HbA1c mean'
+```
+
+Interactive tools, namely `git add -p`, `git rebase -i`,
+and `git bisect`, prompt for input during operation. Their
+prompts and the reader's single-letter responses are shown
+inline, with the response after the tool's `?`-style
+prompt.
+
+Inline commands, file names, and Git objects are set in
+`monospace`. Git subcommands are named in full
+(`git rebase`, not merely `rebase`). Placeholders the reader
+must replace are written in angle brackets, for example
+`git cherry-pick <hash>`. The angle brackets are not typed.
+
+## Callouts
+
+Three callout types appear:
+
+::: {.callout-tip}
+## Tip
+
+A small practical recommendation.
+:::
+
+::: {.callout-note icon=false collapse=true}
+## Check your understanding: example
+
+A short question testing comprehension of the just-read
+material. Click to expand the answer.
+:::
+
+::: {.callout-warning}
+## Warning
+
+A pitfall the reader may otherwise hit. In this volume the
+warnings matter more than in the boot camp, because several
+operations rewrite or discard history irrecoverably.
+:::
+
+## Diagrams of history
+
+Commit history is drawn as a left-to-right graph, with each
+node a commit labelled by a short hash and time flowing
+rightward. Branch names are pointers attached to commits:
+
+```text
+        feature
+           |
+A -- B -- C -- D
+     |
+    main
+```
+
+These diagrams are conceptual; the real hashes are the
+forty-character identifiers Git assigns. When an operation
+changes history, the before and after graphs are shown side
+by side so that the effect is explicit.
+
+## Cross-references
+
+Within this book, sections are referenced by their Quarto
+label (`@sec-day1`, `@sec-interactive-rebase`). These
+resolve to clickable links in HTML and section numbers in
+PDF.
+
+References to the companion volumes *Git and GitHub for
+Biostatistics* and *Biostatistics Practicum* use **prose
+pointers** rather than Quarto cross-references, because
+cross-references do not resolve across separate books.
+
+## Chapter structure
+
+Every content chapter follows the same five-section
+template inherited from the boot camp:
+
+1. **Learning objectives.** What you will be able to do
+   after the day.
+2. **Lecture.** The substantive content, with commands to
+   run in your own terminal.
+3. **Worked example.** A realistic biostatistical scenario
+   that uses the day's content end to end.
+4. **Homework.** Problems organised from easier to harder.
+5. **Solutions.** Worked solutions to all homework
+   problems. Read only after attempting the problem.
+
+Each chapter closes with a short **What's next** pointer.

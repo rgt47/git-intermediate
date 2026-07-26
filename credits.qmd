@@ -1,0 +1,18 @@
+# Credits {.unnumbered}
+
+The three-day scope was chosen to fill the specific gap
+between the companion boot camp and the *Biostatistics
+Practicum*: the version-control craft that a student needs
+within days of the first commit, but that belongs neither
+in a first week nor in an infrastructure course. The topic
+selection draws on Scott Chacon and Ben Straub's *Pro Git*,
+Jenny Bryan's *Happy Git and GitHub for the useR*, and the
+intermediate portions of the Software Carpentry
+version-control lessons.
+
+Cover artwork generated procedurally by the R script at
+`images/build-cover.R`. Palette: deep slate through steel
+and pale mist, anchored on a brand steel blue `#2c4a5e`
+chosen to sit alongside, and one register cooler than, the
+boot camp's rust. Typography: Avenir family (Apple system
+font); body text in Source Serif 4.
