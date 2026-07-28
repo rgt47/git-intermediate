@@ -27,7 +27,7 @@ integration, containerisation, dependency pinning, and
 data-versioning tooling, is left to the *Biostatistics
 Practicum*, which this bridge feeds directly.
 
-The organising principle is unchanged from the boot camp:
+The organizing principle is unchanged from the boot camp:
 version control is a research-integrity tool. Where the boot
 camp taught a student to record history, this bridge teaches
 a student to curate and to recover it, so that the commit
@@ -52,12 +52,12 @@ The scope of each day:
 This bridge is a preparatory companion, alongside the two
 boot camps, to the graduate sequence:
 
-- [*Git and GitHub for Biostatistics*](https://git-bootcamp.rgtlab.org)
-  — the prerequisite boot camp.
-- [*R for Biostatistics*](https://r-bootcamp.rgtlab.org)
-  — the parallel R boot camp.
-- [*Biostatistics Practicum*](https://rgtlab.org/practicum)
-  — workflow infrastructure, which this bridge feeds.
+- [*Git and GitHub for Biostatistics*](https://git-bootcamp.rgtlab.org),
+  the prerequisite boot camp.
+- [*R for Biostatistics*](https://r-bootcamp.rgtlab.org),
+  the parallel R boot camp.
+- [*Biostatistics Practicum*](https://rgtlab.org/practicum),
+  workflow infrastructure, which this bridge feeds.
 
 ## License
 

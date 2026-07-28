@@ -30,7 +30,7 @@ recover from disaster (Day 3).
 Two habits make this safe:
 
 - **Work on a scratch repository while learning.** Do not
-  practise interactive rebase for the first time on a
+  practice interactive rebase for the first time on a
   project you care about. Create a throwaway repository, as
   the homework directs, and experiment there.
 - **Learn the reflog early.** Day 3 covers `git reflog`, the
@@ -55,7 +55,7 @@ uncommitted changes, not in committed history.
 
 The worked examples follow a single project across the
 three days: `trial-analysis`, an R analysis repository for a
-hypothetical randomised trial of a glucose-lowering agent,
+hypothetical randomized trial of a glucose-lowering agent,
 with a primary endpoint of twelve-week change in HbA1c. The
 repository begins Day 1 in the state a boot-camp graduate
 would leave it: a working `analysis.R`, a clean history on

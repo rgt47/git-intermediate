@@ -93,7 +93,7 @@ The labels matter, because they tell you what happened.
 `commit` is an ordinary commit; you will also see
 `reset:`, `rebase (start):`, `rebase (finish):`,
 `checkout:`, `commit (amend):`, and `pull:`. When you are
-hunting for lost work, the label is how you recognise the
+hunting for lost work, the label is how you recognize the
 move that lost it.
 
 ::: {.callout-note icon=false collapse=true}
@@ -367,7 +367,7 @@ Switched to branch 'main'
 Note that `git bisect` does not tell you the change was
 wrong, only which commit is responsible. Whether lowering
 the age-eligibility threshold to 18 was correct is a
-scientific judgement; bisect has narrowed a hundred
+scientific judgment; bisect has narrowed a hundred
 candidates to one so you can make it.
 
 #### Automating with git bisect run
@@ -413,7 +413,7 @@ Mark the current, wrong state `bad` and the old, correct
 commit `good`; here `bad` means 'exhibits the change you are
 tracing' and `good` means 'does not yet'. The labels are
 arbitrary tokens for the two sides of a transition, not moral
-judgements, but they must be consistent with how your test
+judgments, but they must be consistent with how your test
 decides. If you swap them, Git searches the wrong direction,
 assumes the property appeared going backwards in time, and
 either reports a nonsensical 'first bad commit' or complains
@@ -441,7 +441,7 @@ $ git blame -L 8,11 analysis.R
 
 Line 9, the `filter(age >= 18)`, was last touched by
 `9a1c3e5`, on 18 July, the same commit bisect identified. The
-neighbouring lines are older, from `5f3e9c1`. Blame has told
+neighboring lines are older, from `5f3e9c1`. Blame has told
 you when the threshold reached its current value and in which
 commit to look for the reasoning.
 

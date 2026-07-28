@@ -1,6 +1,8 @@
 project:
   type: book
   output-dir: _book
+  pre-render:
+    - tools/us-spelling
 
 book:
   title: 'Intermediate Git for Biostatistics'

@@ -1,6 +1,6 @@
 # Conventions {.unnumbered}
 
-This page summarises the visual conventions used throughout
+This page summarizes the visual conventions used throughout
 the book. They are identical to those of the companion boot
 camp, repeated here for convenience.
 
@@ -64,7 +64,7 @@ operations rewrite or discard history irrecoverably.
 ## Diagrams of history
 
 Commit history is drawn as a left-to-right graph, with each
-node a commit labelled by a short hash and time flowing
+node a commit labeled by a short hash and time flowing
 rightward. Branch names are pointers attached to commits:
 
 ```text
@@ -103,7 +103,7 @@ template inherited from the boot camp:
    run in your own terminal.
 3. **Worked example.** A realistic biostatistical scenario
    that uses the day's content end to end.
-4. **Homework.** Problems organised from easier to harder.
+4. **Homework.** Problems organized from easier to harder.
 5. **Solutions.** Worked solutions to all homework
    problems. Read only after attempting the problem.
 

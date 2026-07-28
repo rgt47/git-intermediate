@@ -107,7 +107,7 @@ The bridge assumes:
   the `gh` command-line tool authenticated as in the boot
   camp.
 
-## Acknowledgements
+## Acknowledgments
 
 This bridge consolidates the intermediate patterns that
 recur in reproducible statistical practice. Scott Chacon
