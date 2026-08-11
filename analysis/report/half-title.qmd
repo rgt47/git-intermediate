@@ -1,3 +1,3 @@
 # Intermediate Git for Biostatistics {.unnumbered .unlisted}
 
-*A Three-Day Bridge from the boot camp to the Practicum.*
+*A Three-Day Boot Camp.*

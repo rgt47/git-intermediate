@@ -1,7 +1,7 @@
 # Welcome {.unnumbered .unlisted}
 
 This is the online version of **Intermediate Git for
-Biostatistics: A Three-Day Bridge** by The rgtlab
+Biostatistics: A Three-Day Boot Camp** by The rgtlab
 Curriculum Project. It is a short second course in version
 control, situated between the boot camp and the graduate
 sequence proper.

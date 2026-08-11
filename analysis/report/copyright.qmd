@@ -1,6 +1,6 @@
 # Copyright {.unnumbered}
 
-*Intermediate Git for Biostatistics: A Three-Day Bridge* by
+*Intermediate Git for Biostatistics: A Three-Day Boot Camp* by
 Ronald 'Ryy' G. Thomas is licensed under a
 [Creative Commons Attribution-NonCommercial-NoDerivatives
 4.0 International
@@ -14,7 +14,7 @@ i.e. the public domain.
 To cite this book, please use:
 
 > Thomas, R. G. (2026). *Intermediate Git for
-> Biostatistics: A Three-Day Bridge*. Available at
+> Biostatistics: A Three-Day Boot Camp*. Available at
 > <https://git-intermediate.rgtlab.org>.
 
 ::: {.content-visible when-format='pdf'}

@@ -1,4 +1,4 @@
-# Intermediate Git for Biostatistics: A Three-Day Bridge
+# Intermediate Git for Biostatistics: A Three-Day Boot Camp
 *2026-07-25 17:56 PDT*
 
 A short second course in version control for graduate

@@ -6,7 +6,7 @@ project:
 
 book:
   title: 'Intermediate Git for Biostatistics'
-  subtitle: 'A Three-Day Bridge from the boot camp to the Practicum'
+  subtitle: 'A Three-Day Boot Camp'
   author: 'The rgtlab Curriculum Project'
   date: today
   date-format: 'YYYY-MM-DD'
