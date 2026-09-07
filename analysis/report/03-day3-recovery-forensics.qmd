@@ -33,24 +33,24 @@ result, or a `git reset --hard` lands on the wrong commit,
 where does the displaced work go?
 
 Nowhere. A commit that no branch and no tag points to is
-unreferenced, not deleted; Git keeps it in the object
+unreferenced, not deleted. Git keeps it in the object
 database until garbage collection eventually prunes it, and
 it records the fact that `HEAD` once pointed there. That
 record is the reflog, and it is the reason the rewriting of
-Day 2 is safe. Today you learn to read it and recover
-through it, then turn from recovery to forensics, that is,
-the commands that reconstruct how a repository reached its
+Day 2 is safe. Today you learn to read it and recover through
+it. We then turn from recovery to forensics, that is, the
+commands that reconstruct how a repository reached its
 present state.
 
 ### What the reflog records
 
 The **reflog** (reference log) is a local, per-repository
-journal of where references have pointed over time. There
-is one for `HEAD` and one for each branch. Every time `HEAD`
-moves, that is, on every commit, checkout, reset, merge,
-rebase step, amend, or pull, Git appends a line to the
-`HEAD` reflog recording the new position and the operation
-that caused the move.
+journal of where references have pointed over time. There is
+one for `HEAD` and one for each branch. Every time `HEAD`
+moves, whether on a commit, checkout, reset, merge, rebase
+step, amend, or pull, Git appends a line to the `HEAD` reflog
+recording the new position and the operation that caused the
+move.
 
 The essential properties to fix in mind:
 
@@ -90,7 +90,7 @@ moves back, and `git diff HEAD@{3} HEAD@{0}` compares then
 with now.
 
 The labels matter, because they tell you what happened.
-`commit` is an ordinary commit; you will also see
+`commit` is an ordinary commit, and you will also see
 `reset:`, `rebase (start):`, `rebase (finish):`,
 `checkout:`, `commit (amend):`, and `pull:`. When you are
 hunting for lost work, the label is how you recognize the
@@ -249,8 +249,8 @@ Point a branch at `7c1b9f4` and the work is restored.
 The reflog cannot recover uncommitted work. Changes you never
 committed, whether discarded by `git restore`, overwritten by
 `git checkout`, or wiped by `git reset --hard`, were never
-written to the object database and leave no reflog entry.
-This is the same irreducible loss Day 1 flagged for
+written to the object database, and they leave no reflog
+entry. This is the same irreducible loss Day 1 flagged for
 `git restore -p`, and it is the only class of loss in this
 book that no command reverses. The reflog protects commits,
 not working-directory edits. If work matters, commit it, if
@@ -277,11 +277,11 @@ The reflog answers 'how do I get my work back'. The rest of
 today answers a different question: 'how did the repository
 come to be as it is'. In statistical practice the trigger is
 almost always a number that moved. A figure in this week's
-report disagrees with last week's; a count in a table is not
-what a co-investigator remembers; a p-value crossed a
+report disagrees with last week's, a count in a table is not
+what a co-investigator remembers, or a p-value crossed a
 threshold. Some commit changed it, and you must find which,
 understand what it did, and decide whether it was correct.
-Git provides three complementary instruments for this:
+Git provides three complementary instruments for this task:
 `git bisect` to find the commit, `git blame` and the pickaxe
 to find the line and its history, and `git show` to read the
 commit once you have it.
@@ -373,7 +373,7 @@ candidates to one so you can make it.
 #### Automating with git bisect run
 
 Testing each midpoint by hand is tedious and, worse,
-error-prone: a moment's inattention and you mark a commit
+error-prone. A moment's inattention and you mark a commit
 `good` that was bad, corrupting the search. If you can
 express the test as a script that exits `0` when the state is
 good and non-zero when it is bad, `git bisect run` performs
@@ -447,12 +447,12 @@ commit to look for the reasoning.
 
 Blame reports only the **last** change to each line. If the
 threshold was 21, then 18, then back to 18 after a revert,
-blame shows only the most recent commit; the earlier history
-is invisible to it. To follow a line across every change, use
-`git log -L`, below. And note what blame does not provide:
-the commit's author and message may explain why the change
-was made, but blame itself answers only who, what, and when,
-never why. For why you must read the commit.
+blame shows only the most recent commit, and the earlier
+history is invisible to it. To follow a line across every
+change, use `git log -L`, below. Note also what blame does
+not provide. The commit's author and message may explain why
+the change was made, but blame itself answers only who,
+what, and when, never why. For why you must read the commit.
 
 ::: {.callout-tip}
 ## Tip
@@ -504,9 +504,9 @@ Both commits that touched the filter are reported: the one
 that introduced it and the one that changed the threshold.
 
 Finally, `git log -L <start>,<end>:<file>` reconstructs the
-complete history of a specific line range, showing each
-commit that changed it together with the diff it applied. It
-answers 'show me everything that ever happened to these
+complete history of a specific line range. It shows each
+commit that changed it together with the diff it applied, and
+so answers 'show me everything that ever happened to these
 lines':
 
 ```bash
@@ -890,16 +890,17 @@ occur.
 ## What's next
 
 You have completed the bridge. Over three days you added
-selective staging and the stash to your daily workflow, made
-the rewriting of history a controlled and reversible tool
-rather than a hazard, and, today, learned the reflog that
-made that rewriting safe all along, together with the forensic
-commands that reconstruct how any value in an analysis came to
-be. With the boot camp behind you and this bridge complete,
-your preparation in version control proper is finished. You
-can compose clean history, revise it deliberately, recover
-from the accidents that revision invites, and investigate the
-provenance of a result down to the line and the commit.
+selective staging and the stash to your daily workflow, and
+you made the rewriting of history a controlled and reversible
+tool rather than a hazard. Today you learned the reflog that
+made that rewriting safe all along, together with the
+forensic commands that reconstruct how any value in an
+analysis came to be. With the boot camp behind you and this
+bridge complete, your preparation in version control proper
+is finished. You can compose clean history, revise it
+deliberately, recover from the accidents that revision
+invites, and investigate the provenance of a result down to
+the line and the commit.
 
 ### Where this bridge hands off
 
@@ -914,7 +915,7 @@ order:
 - Hooks and continuous integration: pre-commit checks and
   GitHub Actions that run tests and validation automatically
   on every push.
-- Containerised, dependency-pinned reproducibility: Docker and
+- Containerized, dependency-pinned reproducibility: Docker and
   `renv` in depth, so that an analysis runs identically on any
   machine and in any year.
 - Data and large-artifact versioning: Git LFS and DVC for the
@@ -926,8 +927,7 @@ order:
 
 Each extends a skill this bridge established into the full
 reproducible pipeline that professional statistical work
-requires. Keep the `trial-analysis` repository; the Practicum
-begins where Day 3 leaves it. Congratulations on completing
-the bridge, and carry the reflog with you: whatever you
-attempt next, committed work is recoverable, and that
-assurance is what lets you work boldly.
+requires. Keep the `trial-analysis` repository, since the
+Practicum begins where Day 3 leaves it. In closing, carry the
+reflog with you. Whatever you attempt next, committed work is
+recoverable, and that assurance is what lets you work boldly.

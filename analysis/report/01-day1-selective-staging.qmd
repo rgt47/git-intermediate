@@ -24,8 +24,8 @@ By the end of this day you should be able to:
 ### The problem: a mixed working directory
 
 The boot camp established a principle: a good commit records
-a single logical change, so that the history reads as a
-sequence of intelligible steps and any one of them can be
+a single logical change. The history then reads as a
+sequence of intelligible steps, and any one of them can be
 understood, reverted, or cited in isolation. The boot camp
 also gave you the tool for the simple case, namely
 `git add <file>` to stage a whole file.
@@ -33,20 +33,20 @@ also gave you the tool for the simple case, namely
 Real editing sessions rarely respect that principle. You sit
 down to fix a bug in `analysis.R` and, while you are there,
 you also improve an unrelated figure caption and add a line
-to the README. Now your working directory contains three
-unrelated changes. `git add analysis.R` would bundle the
-bug fix and the caption change into one commit, and a fourth
+to the README. Your working directory now contains three
+unrelated changes. `git add analysis.R` would bundle the bug
+fix and the caption change into one commit, and a fourth
 `git add .` would sweep in the README too. The result is a
 commit whose message cannot honestly describe it, because it
 does more than one thing.
 
-You have two ways out. You could have committed more often,
-which is good advice but does not help once the changes are
-already interleaved. Or you can stage selectively:
-tell Git precisely which changes belong in the next commit,
-down to the individual line, and leave the rest in the
-working directory for a later commit. That is the subject of
-the first half of today.
+There are two ways out. Committing more often is good
+advice, but it does not help once the changes are already
+interleaved. The alternative is to stage selectively: tell
+Git precisely which changes belong in the next commit, down
+to the individual line, and leave the rest in the working
+directory for a later commit. That is the subject of the
+first half of today.
 
 ### Hunks and patch mode
 
@@ -172,9 +172,10 @@ the rule Git prints in the editor: to exclude an added
 the commit, change its `-` to a space. Save and close, and
 Git stages exactly the edited patch.
 
-Editing hunks by hand is fiddly and error-prone; use it only
-when a hunk genuinely cannot be split. Most of the time,
-committing more often in the first place avoids the need.
+Editing hunks by hand is fiddly and error-prone. Reserve it
+for hunks that genuinely cannot be split. In our experience,
+committing more often in the first place avoids the need
+most of the time.
 
 ::: {.callout-note icon=false collapse=true}
 ## Check your understanding: what does -p operate on?
@@ -219,11 +220,11 @@ on `git restore`:
 $ git restore -p analysis.R
 ```
 
-Here `y` discards the hunk. This is destructive: a discarded
+Here `y` discards the hunk. This is destructive. A discarded
 uncommitted hunk is gone, with no reflog entry to recover it,
 because it was never committed. Use it to drop an
-experimental edit you have decided against, and read the next
-warning first.
+experimental edit you have decided against, but read the
+warning below first.
 
 ::: {.callout-warning}
 ## Warning
@@ -241,7 +242,7 @@ whereas a discard is not.
 
 The second recurring problem of the early weeks is the
 interruption. You are halfway through an edit, the code does
-not yet run, and something urgent arrives: a colleague needs
+not yet run, and something urgent arrives. A colleague needs
 a quick fix on `main`, or you must switch branches to check a
 result. Your working directory is too unfinished to commit,
 but switching branches would carry the mess with you.
@@ -308,10 +309,11 @@ described next; it is visible, named, and recoverable.
 ### Stash or commit? A rule of thumb
 
 Both stashing and a work-in-progress commit let you set work
-aside. They differ in visibility and durability. A stash is
-convenient and quick but invisible to `git status` and
-detached from any branch. A work-in-progress commit is a
-first-class, named, recoverable object.
+aside, and they differ mainly in visibility and durability. A
+stash is convenient and quick, but it is invisible to
+`git status` and detached from any branch. A work-in-progress
+commit, by contrast, is a first-class, named, recoverable
+object.
 
 The working rule: **stash for a brief context switch you
 will reverse within minutes; commit for anything longer.**
@@ -333,12 +335,12 @@ clean, not every intermediate state on your own branch.
 
 The running `trial-analysis` repository is on `main` with a
 clean history. You begin a working session on `analysis.R`
-and make two unrelated edits: you correct a filtering
+and make two unrelated edits. You correct a filtering
 threshold that was excluding eligible participants, and,
 separately, you start a new age-subgroup table that is not
-yet finished. Then a co-investigator emails: the enrollment
-count in yesterday's summary looks wrong, can you check it
-now.
+yet finished. Then a co-investigator emails to say that the
+enrollment count in yesterday's summary looks wrong, and asks
+you to check it now.
 
 Inspect the state. Two hunks, one finished and one not:
 
@@ -361,9 +363,9 @@ $ git commit -m 'Correct age-eligibility threshold to >= 18'
 ```
 
 The unfinished subgroup table remains in the working
-directory. You cannot commit it, it does not run yet, but you
-must switch context to check the co-investigator's number.
-Stash the remainder:
+directory. You cannot commit it, since it does not yet run,
+but you must switch context to check the co-investigator's
+number. Stash the remainder:
 
 ```bash
 $ git stash push -m 'unfinished age-subgroup table'
@@ -398,9 +400,9 @@ b3d5f70 Count enrolled, not screened, participants
 7d9f0b3 Add change-in-HbA1c table by sex
 ```
 
-The history records two clean, separately intelligible fixes;
-the co-investigator's question was answered without losing
-the in-progress table; and no unrelated changes were bundled
+The history records two clean, separately intelligible fixes.
+The co-investigator's question was answered without losing
+the in-progress table, and no unrelated changes were bundled
 together. This is the everyday value of selective staging and
 the stash.
 
@@ -483,7 +485,7 @@ git log --oneline
 ```
 
 The unchanged middle line gives Git the gap it needs to
-present the two edits as separate hunks, so patch mode can
+present the two edits as separate hunks. Patch mode can then
 stage them independently.
 
 **Problem 2.** After staging only the first new line,
@@ -517,13 +519,12 @@ both headings because one hunk is staged and one is not.
 **Problem 4.** You cannot recover it. `git restore script.R`
 overwrites the working-directory copy with the version from
 the last commit, and the discarded edit was never committed
-or stashed, so it exists nowhere in Git's object database.
-The reflog, which rescues committed work on Day 3, cannot
-help, because it tracks commits and branch tips, not
+or stashed. It exists nowhere in Git's object database. The
+reflog, which rescues committed work on Day 3, cannot help
+here, because it tracks commits and branch tips, not
 uncommitted working-directory changes. This is the one truly
-unrecoverable class of loss in Git, and the reason the
-lecture warns against `restore` on changes you are unsure
-about.
+unrecoverable class of loss in Git, and it is why the lecture
+warns against `restore` on changes you are unsure about.
 
 **Problem 5.**
 
@@ -584,10 +585,10 @@ also work but is heavier than the moment requires.
 
 Today you learned to assemble clean commits as you go and to
 set work aside safely. Day 2 turns to history that is already
-recorded but not yet clean: amending the last commit,
-and using interactive rebase to reword, reorder, squash, and
-drop earlier commits, so that a branch of work-in-progress
-commits becomes a sequence a reviewer can read. It also fixes
-the boundary that governs all of this, namely when rewriting
-is safe and when it is forbidden. Keep the `trial-analysis`
-repository; Day 2 continues from here.
+recorded but not yet clean: amending the last commit, and
+using interactive rebase to reword, reorder, squash, and drop
+earlier commits, so that a branch of work-in-progress commits
+becomes a sequence a reviewer can read. It also sets out the
+boundary that governs all of this, namely when rewriting is
+safe and when it is forbidden. Keep the `trial-analysis`
+repository, since Day 2 continues from here.

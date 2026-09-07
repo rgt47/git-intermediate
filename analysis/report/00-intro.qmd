@@ -23,8 +23,8 @@ Three consecutive days complete the bridge.
 The boot camp's operations were almost all additive: a new
 commit, a new branch, a merge. They rarely destroyed
 anything. This bridge is different. Several of its
-operations rewrite history (Day 2) or can discard
-uncommitted work (Day 1), and one exists precisely to
+operations rewrite history (Day 2), and some can discard
+uncommitted work (Day 1). One chapter exists precisely to
 recover from disaster (Day 3).
 
 Two habits make this safe:
@@ -35,11 +35,11 @@ Two habits make this safe:
   the homework directs, and experiment there.
 - **Learn the reflog early.** Day 3 covers `git reflog`, the
   log of everywhere `HEAD` has been. It is the safety net
-  beneath nearly every operation in this book: almost
-  anything that is committed can be recovered through it.
-  The single exception, uncommitted work destroyed by
-  `git reset --hard` or `git restore`, is flagged wherever
-  it arises.
+  beneath nearly every operation in this book. Almost
+  anything that has been committed can be recovered through
+  it. The one exception, uncommitted work destroyed by
+  `git reset --hard` or `git restore`, is flagged wherever it
+  arises.
 
 ::: {.callout-tip}
 ## Tip

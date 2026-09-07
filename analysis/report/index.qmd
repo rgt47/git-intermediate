@@ -3,36 +3,36 @@
 This is the online version of **Intermediate Git for
 Biostatistics: A Three-Day Boot Camp** by The rgtlab
 Curriculum Project. It is a short second course in version
-control, situated between the boot camp and the graduate
-sequence proper.
+control. We have situated it between the boot camp and the
+graduate sequence proper.
 
 The companion volume *Git and GitHub for Biostatistics: A
 One-Week Boot Camp* takes a student from never having made
-a commit to collaborating through pull requests. This
-bridge picks up there. It teaches the intermediate skills a
-student reaches for within days of finishing the boot camp:
+a commit to collaborating through pull requests. This bridge
+picks up there. It teaches the intermediate skills a student
+reaches for within days of finishing the boot camp:
 committing a clean subset of a messy working directory,
 shelving work in progress, curating a branch's history into
 something a reviewer can read, and recovering when an
 operation goes wrong. These are the skills that separate a
-tidy, reproducible project history from a serviceable but
-untrustworthy one.
+tidy, reproducible project history from one that is merely
+serviceable.
 
 The bridge is deliberately short, **three days** rather than
 five, at the same daily cadence: one hour of lecture, two
-hours of homework, no examinations. It is not a survey of
-everything Git can do. The infrastructure that surrounds
-version control in professional practice, namely continuous
-integration, containerisation, dependency pinning, and
-data-versioning tooling, is left to the *Biostatistics
+hours of homework, no examinations. It is not intended as a
+survey of everything Git can do. We leave the infrastructure
+that surrounds version control in professional practice,
+namely continuous integration, containerization, dependency
+pinning, and data-versioning tooling, to the *Biostatistics
 Practicum*, which this bridge feeds directly.
 
 The organizing principle is unchanged from the boot camp:
 version control is a research-integrity tool. Where the boot
-camp taught a student to record history, this bridge teaches
-a student to curate and to recover it, so that the commit
-log remains a faithful and legible account of how an
-analysis was built.
+camp teaches a student to record history, this bridge teaches
+a student to curate and to recover it. The aim, in both
+cases, is a commit log that remains a faithful and legible
+account of how an analysis was built.
 
 The scope of each day:
 

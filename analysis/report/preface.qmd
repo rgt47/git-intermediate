@@ -13,9 +13,10 @@ irreducible daily workflow: `init`, `add`, `commit`,
 `status`, `log`, `diff`, the undo commands, branching and
 merging, remotes, and the pull-request cycle on GitHub. A
 student who completes it can work reproducibly and
-collaborate. Within days of finishing, however, that
-student meets a predictable set of problems the boot camp
-did not cover:
+collaborate. Within days of finishing, however, that student
+meets a predictable set of problems that the boot camp did
+not cover. We list them here because each recurs often
+enough to warrant a chapter of its own.
 
 - The working directory contains two unrelated changes, and
   the student wants each in its own commit rather than one
@@ -30,8 +31,8 @@ did not cover:
 - A number in a table changed between two analyses and
   nobody can say which commit changed it.
 
-Each of these has a standard, learnable solution, and none
-belongs in a first week. They also do not belong in the
+Each of these problems has a standard, learnable solution,
+and none belongs in a first week. Nor do they belong in the
 *Practicum*, whose subject is the infrastructure around
 version control (Docker, `renv`, continuous integration,
 CDISC deliverables) rather than the version-control craft
@@ -71,7 +72,7 @@ The bridge stops short of the infrastructure that the
 
 - Continuous integration and GitHub Actions.
 - Pre-commit hooks and automated checks.
-- Containerised, dependency-pinned reproducibility (Docker,
+- Containerized, dependency-pinned reproducibility (Docker,
   `renv` in depth).
 - Data and large-artifact versioning (Git LFS, DVC).
 - Regulatory version-control practice for clinical trials
@@ -79,7 +80,7 @@ The bridge stops short of the infrastructure that the
 - Team-scale collaboration policy (branch protection,
   `CODEOWNERS`, review requirements, `rerere`).
 
-Each of these is named where it naturally arises, with a
+We name each of these where it naturally arises, with a
 pointer to the *Practicum*.
 
 ## How this bridge is meant to be used
@@ -87,9 +88,10 @@ pointer to the *Practicum*.
 The three-day cadence matches the boot camp: roughly three
 hours of focused work per day, one hour reading with a
 terminal open and two hours on the homework. Every command
-should be run, not merely read; the history-altering
-operations in particular are learned only by performing
-them on a scratch repository and observing the result.
+should be run, not merely read. This is especially true of
+the history-altering operations, which are learned only by
+performing them on a scratch repository and observing the
+result.
 
 The commands are shown for a Unix-style shell (macOS
 Terminal, Linux, or Git Bash on Windows), consistent with
@@ -110,9 +112,9 @@ The bridge assumes:
 ## Acknowledgments
 
 This bridge consolidates the intermediate patterns that
-recur in reproducible statistical practice. Scott Chacon
-and Ben Straub's *Pro Git* and Jenny Bryan's *Happy Git and
-GitHub for the useR* provide the technical scaffolding; the
-selection reflects experience with the specific problems
-incoming students hit in the weeks after their first
-commit.
+recur in reproducible statistical practice. Scott Chacon and
+Ben Straub's *Pro Git* and Jenny Bryan's *Happy Git and
+GitHub for the useR* provide the technical scaffolding. The
+selection of topics reflects experience with the specific
+problems that incoming students meet in the weeks after
+their first commit.

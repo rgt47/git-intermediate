@@ -47,10 +47,11 @@ message, its author, and its parent. You cannot edit a
 commit. What the commands below actually do is build a
 **new** commit from the old one plus your change, give it a
 new hash, and move the branch pointer to it. The original
-commit is not modified; it is abandoned, left with no branch
-pointing at it, to be recovered through the reflog (Day 3)
-or eventually garbage-collected. Keep this in mind: every
-'edit' of history in this chapter is a replacement.
+commit is not modified. It is abandoned, left with no branch
+pointing at it, and can be recovered through the reflog
+(Day 3) until it is eventually garbage-collected. Keep this
+in mind: every 'edit' of history in this chapter is a
+replacement.
 
 ### Amending the last commit
 
@@ -106,13 +107,13 @@ You commit, then run `git add forgotten.R` and
 does `git log --oneline` show compared with before, and has
 the hash of the top commit changed?
 
-The count is unchanged: amend does not add a commit, it
+The count is unchanged. Amend does not add a commit; it
 replaces the existing top commit. The hash of that top
 commit **has** changed, because the new commit contains an
 extra file and therefore a different content checksum. The
 old commit still exists in the object database, reachable
 through the reflog, but no branch points to it. This is why
-amend, like rebase, is safe only on unpublished commits: any
+amend, like rebase, is safe only on unpublished commits. Any
 collaborator who had fetched the old hash now holds a commit
 your branch no longer contains.
 :::
@@ -125,7 +126,7 @@ subject to the governing rule below. If the commit you are
 amending has already been pushed to a shared branch, amending
 it and pushing again forces a divergence that every
 collaborator must reconcile. Amend freely while the commit is
-still local; think twice once it has left your machine.
+still local, but think twice once it has left your machine.
 :::
 
 ### Referring to commits
@@ -158,7 +159,8 @@ takes a run of consecutive commits, presents them as an
 editable 'to-do' list, and replays them according to the
 instructions you leave. With it you can reword messages,
 reorder commits, combine several into one, split work across
-a stop, and delete commits entirely.
+a stop, and delete commits entirely, all before anyone else
+sees them.
 
 Start it by naming the base commit, the one just before the
 first commit you want to touch:
@@ -407,11 +409,11 @@ The reason is mechanical. Rewriting a pushed commit replaces
 it with one of a different hash, so your branch and the
 remote disagree about what commits exist. A collaborator who
 pulled the original still holds it, along with any work built
-on top of it; when your rewritten branch reaches them, Git
-cannot fast-forward, and their downstream commits, now
-parented on a commit that no longer exists on the remote, can
-be duplicated or lost. A single rewrite of a shared branch
-can cost a team an afternoon.
+on top of it. When your rewritten branch reaches them, Git
+cannot fast-forward. Their downstream commits, now parented
+on a commit that no longer exists on the remote, can be
+duplicated or lost. A single rewrite of a shared branch can
+cost a team an afternoon.
 
 The safe domain of rewriting is therefore precise:
 
@@ -452,12 +454,13 @@ ordinary push.
 ### Updating a pushed branch with force-with-lease
 
 Once you rewrite commits you have already pushed, an ordinary
-`git push` is rejected: the remote and your rewritten branch
+`git push` is rejected. The remote and your rewritten branch
 have diverged, and Git will not fast-forward. You must tell
 Git to replace the remote branch with yours. The naive tool
-is `git push --force`, and it is dangerous: it overwrites the
-remote branch unconditionally, discarding any commit a
-collaborator pushed in the interval that you have not seen.
+is `git push --force`, and it is dangerous, since it
+overwrites the remote branch unconditionally, discarding any
+commit a collaborator pushed in the interval that you have
+not seen.
 
 Prefer `git push --force-with-lease`. It force-pushes only if
 the remote branch is still where you last observed it; if
@@ -473,9 +476,9 @@ $ git push --force-with-lease origin subgroup-analysis
 The distinction is the whole point. `--force` says 'make the
 remote match me, whatever is there'. `--force-with-lease`
 says 'make the remote match me, but only if it is still what
-I last saw'. The second refuses in exactly the case, an
-unexpected push by someone else, where the first would
-silently destroy work.
+I last saw'. The second refuses in exactly the case where the
+first would silently destroy work, namely an unexpected push
+by someone else.
 
 ::: {.callout-warning}
 ## Warning
@@ -835,14 +838,15 @@ with `git push --force-with-lease`, never a bare `--force`.
 Today you learned to reshape recorded history: amending the
 last commit, squashing and rewording a branch of
 work-in-progress commits into a clean sequence with
-interactive rebase, lifting a single commit with cherry-pick,
-and updating a personal branch safely with
-`--force-with-lease`, all bounded by the rule that published
-history is not rewritten. Every one of these operations
-replaces commits, and a replaced commit is not destroyed but
-merely unreferenced. Day 3 makes that safety net explicit: it
-covers `git reflog`, which records everywhere `HEAD` has
-been and lets you recover a commit abandoned by a rebase or an
-amend, and then `git bisect` and `git blame` for finding when
-and where a result changed. Keep the `trial-analysis`
-repository; Day 3 continues from here.
+interactive rebase, lifting a single commit with
+cherry-pick, and updating a personal branch safely with
+`--force-with-lease`. All of this is bounded by the rule that
+published history is not rewritten. Every one of these
+operations replaces commits, and a replaced commit is not
+destroyed but merely unreferenced. Day 3 makes that safety
+net explicit. It covers `git reflog`, which records
+everywhere `HEAD` has been and lets you recover a commit
+abandoned by a rebase or an amend, and then `git bisect` and
+`git blame` for finding when and where a result changed.
+Keep the `trial-analysis` repository, since Day 3 continues
+from here.
