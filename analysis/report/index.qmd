@@ -59,6 +59,10 @@ boot camps, to the graduate sequence:
 - [*Biostatistics Practicum*](https://rgtlab.org/practicum),
   workflow infrastructure, which this bridge feeds.
 
+::: {.content-visible when-format="html"}
+The [Contents](contents.qmd) page lists every chapter on one page.
+:::
+
 ## License
 
 This book is licensed under

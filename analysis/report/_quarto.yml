@@ -3,6 +3,7 @@ project:
   output-dir: _book
   pre-render:
     - ../../tools/us-spelling
+    - ../../tools/make-contents.py
 
 # DRAFT: delete this block at release. Quarto reads the banner only
 # from website:, and a book project does not copy it over from book:.
@@ -43,6 +44,7 @@ book:
     - half-title.qmd
     - copyright.qmd
     - index.qmd
+    - contents.qmd
     - preface.qmd
     - conventions.qmd
     - 00-intro.qmd
